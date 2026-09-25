@@ -13,6 +13,7 @@ namespace JabraDesktop.App;
 public class App : Application
 {
     SingleInstanceCoordinator? instanceCoordinator;
+    readonly AutostartManager autostartManager = new();
     DeviceSession? session;
     MainViewModel? viewModel;
     MainWindow? mainWindow;
