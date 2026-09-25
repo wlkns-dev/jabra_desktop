@@ -17,9 +17,69 @@ Das fertig veröffentlichte Programm liegt nach dem Build unter
 Es benötigt keinen laufenden Webserver. Die SDK-Gerätekommunikation verwendet
 einen lokalen Jabra-Hilfsprozess. Die App als normaler Benutzer starten.
 
-Der Desktop-Eintrag `packaging/jabra-desktop.desktop` verweist auf den aktuellen
-Projektpfad. Für einen anderen Installationsort die `Exec`-Zeile anpassen.
-Er kann nach `~/.local/share/applications/` kopiert werden.
+Der paketierte Desktop-Eintrag verwendet den festen Starter `jabra-desktop`.
+Wenn du aus dem Quellcheckout arbeitest, starte die App mit `./scripts/run.sh`;
+der paketierte Menüeintrag ist für die Systeminstallation gedacht.
+
+## Arch-Paket erstellen und installieren
+
+Auf Arch Linux oder CachyOS wird `base-devel` für `makepkg` benötigt. Außerdem
+muss das .NET-10-SDK verfügbar sein; die obige Entwicklungsanleitung richtet
+Version 10.0.401 lokal unter `.tools/dotnet` ein. Aus einem zugänglichen
+Checkout:
+
+```bash
+./scripts/package.sh
+package_file="$(cd packaging && makepkg --packagelist)"
+sudo pacman -U "$package_file"
+```
+
+Das Paket installiert die App nach `/opt/jabra-desktop`, den Starter
+`/usr/bin/jabra-desktop`, den Menüeintrag, das Icon, die udev-Regel und die
+Drittanbieterhinweise. Danach kann Jabra Desktop über das Anwendungsmenü oder
+mit `jabra-desktop` gestartet werden. Falls der Dongle noch keinen Zugriff hat,
+die udev-Regeln neu laden und den Dongle erneut anstecken:
+
+```bash
+sudo udevadm control --reload-rules
+```
+
+Das Tray-Menü kann den Autostart für den aktuellen Benutzer ein- und
+ausschalten. Er ist standardmäßig aus. Der Eintrag liegt in
+`${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop`. Beim
+Entfernen des Pakets bleibt diese persönliche Einstellung erhalten und kann bei
+Bedarf manuell gelöscht werden.
+
+Ein lokales Update wird aus einem neueren Checkout gebaut und mit Pacman
+installiert:
+
+```bash
+git pull
+./scripts/package.sh
+package_file="$(cd packaging && makepkg --packagelist)"
+sudo pacman -U "$package_file"
+```
+
+Softwarestände verwenden annotierte Git-Tags wie `v0.1.0`. Die Version in
+`Directory.Build.props` und `pkgver` im PKGBUILD müssen dazu passen; für eine
+reine Paketkorrektur wird stattdessen `pkgrel` erhöht. Einen eingebauten
+Updater gibt es nicht. Fertige Pakete sollen später als GitHub Releases
+verfügbar sein, sobald die Weitergabebedingungen der Jabra-SDK-Binärdateien
+geklärt sind. Bis dahin ist lokaler Selbstbau der vorgesehene Weg. AUR und ein
+automatisiertes Pacman-Repository sind noch nicht eingerichtet.
+
+Deinstallation:
+
+```bash
+sudo pacman -R jabra-desktop
+```
+
+Falls der Autostart zuvor aktiviert war, kann die persönliche Datei zusätzlich
+entfernt werden:
+
+```bash
+rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
+```
 
 ## Geräte verwenden
 
