@@ -18,12 +18,15 @@ public partial class App : Application
     MainViewModel? viewModel;
     MainWindow? mainWindow;
     DispatcherTimer? refreshTimer;
+    DispatcherTimer? trayMonitorTimer;
     TrayIcon? trayIcon;
     NativeMenuItem? autostartMenuItem;
     bool activationPending;
     bool cleanupStarted;
     bool trayAvailable;
     bool shutdownRequested;
+    bool trayProbeRunning;
+    Task? cleanupTask;
     IClassicDesktopStyleApplicationLifetime? desktopLifetime;
 
     public override void Initialize()
@@ -40,7 +43,6 @@ public partial class App : Application
         {
             desktopLifetime = desktop;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            desktop.Exit += async (_, _) => await CleanupAsync();
             _ = StartDesktopAsync(desktop);
         }
         base.OnFrameworkInitializationCompleted();
@@ -64,6 +66,7 @@ public partial class App : Application
             if (autostartMenuItem is not null)
             {
                 autostartMenuItem.IsEnabled = autostartManager.IsAvailable;
+                if (!autostartManager.IsAvailable) autostartMenuItem.Header = "Autostart (nur installiert)";
                 autostartMenuItem.IsChecked = autostartManager.IsEnabled;
             }
 
@@ -78,6 +81,9 @@ public partial class App : Application
             {
                 if (viewModel?.CanScan == true) await viewModel.RefreshAsync();
             };
+            trayMonitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            trayMonitorTimer.Tick += async (_, _) => await RefreshTrayAvailabilityAsync();
+            trayMonitorTimer.Start();
             mainWindow.Opened += async (_, _) =>
             {
                 if (viewModel is not null) await viewModel.StartAsync();
@@ -85,11 +91,11 @@ public partial class App : Application
             };
             mainWindow.Closing += (_, e) =>
             {
-                if (!trayAvailable || shutdownRequested) return;
+                if (shutdownRequested) return;
                 e.Cancel = true;
-                mainWindow.HideToTray();
+                if (trayAvailable) mainWindow.HideToTray();
+                else _ = ShutdownAndExitAsync();
             };
-            mainWindow.Closed += (_, _) => desktop.Shutdown();
 
             mainWindow.Show();
             if (Program.StartHidden && trayAvailable) mainWindow.HideToTray();
@@ -120,11 +126,24 @@ public partial class App : Application
 
     void OpenFromTray(object? sender, EventArgs e) => ActivateMainWindow();
 
-    void QuitFromTray(object? sender, EventArgs e)
+    async void QuitFromTray(object? sender, EventArgs e)
     {
-        shutdownRequested = true;
-        mainWindow?.Close();
-        desktopLifetime?.Shutdown();
+        await ShutdownAndExitAsync();
+    }
+
+    async Task RefreshTrayAvailabilityAsync()
+    {
+        if (trayProbeRunning || shutdownRequested) return;
+        trayProbeRunning = true;
+        try
+        {
+            var available = await TrayAvailability.IsAvailableAsync(CancellationToken.None);
+            if (available == trayAvailable) return;
+            trayAvailable = available;
+            if (trayIcon is not null) trayIcon.IsVisible = available;
+            if (!available && mainWindow is { IsVisible: false }) mainWindow.ShowAndActivate();
+        }
+        finally { trayProbeRunning = false; }
     }
 
     void ToggleAutostart(object? sender, EventArgs e)
@@ -191,13 +210,25 @@ public partial class App : Application
         window.Show();
     }
 
-    async Task CleanupAsync()
+    Task CleanupAsync() => cleanupTask ??= CleanupCoreAsync();
+
+    async Task CleanupCoreAsync()
     {
         if (cleanupStarted) return;
         cleanupStarted = true;
+        trayMonitorTimer?.Stop();
         refreshTimer?.Stop();
         viewModel?.Dispose();
         if (session is not null) await session.DisposeAsync();
         if (instanceCoordinator is not null) await instanceCoordinator.DisposeAsync();
+    }
+
+    async Task ShutdownAndExitAsync()
+    {
+        if (shutdownRequested) return;
+        shutdownRequested = true;
+        await CleanupAsync();
+        mainWindow?.Close();
+        desktopLifetime?.Shutdown();
     }
 }

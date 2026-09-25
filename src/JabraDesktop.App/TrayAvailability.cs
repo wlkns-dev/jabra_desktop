@@ -4,15 +4,15 @@ namespace JabraDesktop.App;
 
 internal static class TrayAvailability
 {
-    static readonly string[] Watchers =
+    static readonly (string BusName, string Interface)[] Watchers =
     [
-        "org.kde.StatusNotifierWatcher",
-        "org.freedesktop.StatusNotifierWatcher"
+        ("org.kde.StatusNotifierWatcher", "org.kde.StatusNotifierWatcher"),
+        ("org.freedesktop.StatusNotifierWatcher", "org.freedesktop.StatusNotifierWatcher")
     ];
 
     public static async Task<bool> IsAvailableAsync(CancellationToken token)
     {
-        foreach (var watcher in Watchers)
+        foreach (var (watcher, watcherInterface) in Watchers)
         {
             using var process = new Process
             {
@@ -26,23 +26,25 @@ internal static class TrayAvailability
             };
             foreach (var argument in new[]
             {
-                "--user", "--no-pager", "call", "org.freedesktop.DBus",
-                "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", "s", watcher
+                "--user", "--no-pager", "get-property", watcher,
+                "/StatusNotifierWatcher", watcherInterface, "IsStatusNotifierHostRegistered"
             }) process.StartInfo.ArgumentList.Add(argument);
 
+            var started = false;
             try
             {
-                if (!process.Start()) continue;
+                started = process.Start();
+                if (!started) continue;
                 var outputTask = process.StandardOutput.ReadToEndAsync(token);
                 var exitTask = process.WaitForExitAsync(token);
                 await exitTask.WaitAsync(TimeSpan.FromSeconds(1), token);
                 var output = await outputTask;
-                if (process.ExitCode == 0 && output.Trim().EndsWith("true", StringComparison.OrdinalIgnoreCase))
+                if (process.ExitCode == 0 && output.Trim().Equals("b true", StringComparison.OrdinalIgnoreCase))
                     return true;
             }
             catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or IOException or TimeoutException)
             {
-                if (!process.HasExited)
+                if (started && !process.HasExited)
                 {
                     try { process.Kill(entireProcessTree: true); }
                     catch (InvalidOperationException) { }
@@ -50,7 +52,7 @@ internal static class TrayAvailability
             }
             catch (OperationCanceledException)
             {
-                if (!process.HasExited)
+                if (started && !process.HasExited)
                 {
                     try { process.Kill(entireProcessTree: true); }
                     catch (InvalidOperationException) { }

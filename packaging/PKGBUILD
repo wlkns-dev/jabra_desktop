@@ -29,7 +29,7 @@ package() {
         -cf - . | tar -C "${pkgdir}/opt/jabra-desktop" --no-same-owner -xf -
 
     install -d "${pkgdir}/usr/bin"
-    printf '#!/usr/bin/sh\nexec /opt/jabra-desktop/JabraDesktop.App "\$@"\n' \
+    printf '#!/usr/bin/sh\nexec /opt/jabra-desktop/JabraDesktop.App "$@"\n' \
         > "${pkgdir}/usr/bin/jabra-desktop"
     chmod 0755 "${pkgdir}/usr/bin/jabra-desktop"
 

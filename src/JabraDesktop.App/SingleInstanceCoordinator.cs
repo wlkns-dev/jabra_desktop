@@ -9,6 +9,7 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
     const string ActivationMessage = "show";
     readonly string pipeName = $"jabra-desktop-{GetUserId()}";
     readonly CancellationTokenSource lifetime = new();
+    FileStream? ownershipLock;
     Task? serverTask;
     bool disposed;
 
@@ -17,45 +18,97 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
 
     public async Task<bool> TryBecomePrimaryAsync(Func<Task> onActivate, CancellationToken token)
     {
-        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        serverTask = ServeAsync(onActivate, ready, lifetime.Token);
-
+        var lockPath = ResolveLockPath();
+        var lockStream = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
         try
         {
-            await ready.Task.WaitAsync(token);
-            return true;
+            File.SetUnixFileMode(lockPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            lockStream.Lock(0, 1);
+            ownershipLock = lockStream;
         }
         catch (IOException)
         {
-            lifetime.Cancel();
-            try { await serverTask; }
-            catch (IOException) { }
-            catch (OperationCanceledException) { }
-
+            lockStream.Dispose();
             if (await NotifyExistingAsync(token)) return false;
-            throw new IOException("Eine zweite Jabra-Desktop-Instanz läuft, konnte aber nicht aktiviert werden.");
+            throw new IOException("Die laufende Jabra-Desktop-Instanz konnte nicht aktiviert werden.");
+        }
+
+        try
+        {
+            var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            serverTask = ServeAsync(onActivate, ready, firstPipeInstance: true, lifetime.Token);
+            try
+            {
+                await ready.Task.WaitAsync(token);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                await IgnoreStartupFailureAsync(serverTask);
+                if (await NotifyExistingAsync(token))
+                {
+                    ownershipLock.Dispose();
+                    ownershipLock = null;
+                    return false;
+                }
+
+                // The lock proves that no current version owns this name; an unbound pathname is stale.
+                ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                serverTask = ServeAsync(onActivate, ready, firstPipeInstance: false, lifetime.Token);
+                await ready.Task.WaitAsync(token);
+                return true;
+            }
+        }
+        catch
+        {
+            ownershipLock?.Dispose();
+            ownershipLock = null;
+            throw;
         }
     }
 
-    async Task ServeAsync(Func<Task> onActivate, TaskCompletionSource ready, CancellationToken token)
+    static string ResolveLockPath()
+    {
+        var runtimeDirectory = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+        if (!string.IsNullOrWhiteSpace(runtimeDirectory) && Path.IsPathFullyQualified(runtimeDirectory)
+            && Directory.Exists(runtimeDirectory))
+            return Path.Combine(runtimeDirectory, $"jabra-desktop-{GetUserId()}.lock");
+
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrWhiteSpace(home))
+            throw new InvalidOperationException("Das Benutzerverzeichnis konnte nicht bestimmt werden.");
+        var privateDirectory = Path.Combine(home, ".cache", "jabra-desktop");
+        Directory.CreateDirectory(privateDirectory);
+        File.SetUnixFileMode(privateDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        return Path.Combine(privateDirectory, $"jabra-desktop-{GetUserId()}.lock");
+    }
+
+    async Task ServeAsync(Func<Task> onActivate, TaskCompletionSource ready, bool firstPipeInstance, CancellationToken token)
     {
         try
         {
+            var options = PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
+            if (firstPipeInstance) options |= PipeOptions.FirstPipeInstance;
             await using var server = new NamedPipeServerStream(
-                pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, options);
 
             var connection = server.WaitForConnectionAsync(token);
             ready.TrySetResult();
             while (true)
             {
                 await connection;
-                using (var reader = new StreamReader(server, Encoding.UTF8, false, 1024, leaveOpen: true))
+                try
                 {
-                    var command = await reader.ReadLineAsync(token);
-                    if (command == ActivationMessage) await onActivate();
+                    using var reader = new StreamReader(server, Encoding.UTF8, false, 1024, leaveOpen: true);
+                    if (await reader.ReadLineAsync(token) == ActivationMessage)
+                        await onActivate();
                 }
-                server.Disconnect();
+                catch (IOException)
+                {
+                    // A broken activation client must not take down the primary instance.
+                }
+
+                if (server.IsConnected) server.Disconnect();
                 connection = server.WaitForConnectionAsync(token);
             }
         }
@@ -79,16 +132,22 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
                 await writer.WriteLineAsync(ActivationMessage);
                 return true;
             }
-            catch (TimeoutException) when (attempt < 2)
+            catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
             {
-                await Task.Delay(100, token);
-            }
-            catch (IOException) when (attempt < 2)
-            {
+                if (attempt == 2) return false;
                 await Task.Delay(100, token);
             }
         }
         return false;
+    }
+
+    static async Task IgnoreStartupFailureAsync(Task? task)
+    {
+        if (task is null) return;
+        try { await task; }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (OperationCanceledException) { }
     }
 
     public async ValueTask DisposeAsync()
@@ -101,7 +160,10 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
             try { await serverTask; }
             catch (OperationCanceledException) { }
             catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
+        ownershipLock?.Dispose();
+        ownershipLock = null;
         lifetime.Dispose();
     }
 }

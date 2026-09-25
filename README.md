@@ -45,7 +45,11 @@ sudo udevadm control --reload-rules
 ```
 
 Das Tray-Menü kann den Autostart für den aktuellen Benutzer ein- und
-ausschalten. Er ist standardmäßig aus. Der Eintrag liegt in
+ausschalten. „Öffnen“ stellt das Fenster wieder her; „Beenden“ schließt die
+Anwendung vollständig. Ein Fensterschluss blendet sie ins Tray aus, solange
+eine Tray-Umgebung verfügbar ist. Fällt diese weg, wird ein verborgenes Fenster
+wieder eingeblendet und der nächste Fensterschluss beendet die Anwendung.
+Autostart ist standardmäßig aus. Der Eintrag liegt in
 `${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop`. Beim
 Entfernen des Pakets bleibt diese persönliche Einstellung erhalten und kann bei
 Bedarf manuell gelöscht werden.
