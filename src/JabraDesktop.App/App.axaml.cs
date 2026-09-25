@@ -10,7 +10,7 @@ using JabraDesktop.Jabra;
 
 namespace JabraDesktop.App;
 
-public class App : Application
+public partial class App : Application
 {
     SingleInstanceCoordinator? instanceCoordinator;
     readonly AutostartManager autostartManager = new();
@@ -18,15 +18,27 @@ public class App : Application
     MainViewModel? viewModel;
     MainWindow? mainWindow;
     DispatcherTimer? refreshTimer;
+    TrayIcon? trayIcon;
+    NativeMenuItem? autostartMenuItem;
     bool activationPending;
     bool cleanupStarted;
+    bool trayAvailable;
+    bool shutdownRequested;
+    IClassicDesktopStyleApplicationLifetime? desktopLifetime;
 
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        trayIcon = TrayIcon.GetIcons(this)?.FirstOrDefault();
+        autostartMenuItem = trayIcon?.Menu?.Items.OfType<NativeMenuItem>()
+            .FirstOrDefault(item => Equals(item.Header, "Autostart"));
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktopLifetime = desktop;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             desktop.Exit += async (_, _) => await CleanupAsync();
             _ = StartDesktopAsync(desktop);
@@ -47,6 +59,14 @@ public class App : Application
                 return;
             }
 
+            trayAvailable = await TrayAvailability.IsAvailableAsync(CancellationToken.None);
+            if (trayIcon is not null) trayIcon.IsVisible = trayAvailable;
+            if (autostartMenuItem is not null)
+            {
+                autostartMenuItem.IsEnabled = autostartManager.IsAvailable;
+                autostartMenuItem.IsChecked = autostartManager.IsEnabled;
+            }
+
             session = new DeviceSession(new JabraBackend());
             viewModel = new MainViewModel(session, action => Dispatcher.UIThread.Post(action));
             mainWindow = new MainWindow { DataContext = viewModel };
@@ -63,9 +83,16 @@ public class App : Application
                 if (viewModel is not null) await viewModel.StartAsync();
                 refreshTimer.Start();
             };
+            mainWindow.Closing += (_, e) =>
+            {
+                if (!trayAvailable || shutdownRequested) return;
+                e.Cancel = true;
+                mainWindow.HideToTray();
+            };
             mainWindow.Closed += (_, _) => desktop.Shutdown();
 
             mainWindow.Show();
+            if (Program.StartHidden && trayAvailable) mainWindow.HideToTray();
             if (activationPending) ActivateMainWindow();
         }
         catch (Exception ex)
@@ -88,9 +115,54 @@ public class App : Application
     void ActivateMainWindow()
     {
         if (mainWindow is null) return;
-        mainWindow.Show();
-        if (mainWindow.WindowState == WindowState.Minimized) mainWindow.WindowState = WindowState.Normal;
-        mainWindow.Activate();
+        mainWindow.ShowAndActivate();
+    }
+
+    void OpenFromTray(object? sender, EventArgs e) => ActivateMainWindow();
+
+    void QuitFromTray(object? sender, EventArgs e)
+    {
+        shutdownRequested = true;
+        mainWindow?.Close();
+        desktopLifetime?.Shutdown();
+    }
+
+    void ToggleAutostart(object? sender, EventArgs e)
+    {
+        var previousState = autostartManager.IsEnabled;
+        try
+        {
+            autostartManager.SetEnabled(!previousState);
+            if (autostartMenuItem is not null) autostartMenuItem.IsChecked = autostartManager.IsEnabled;
+        }
+        catch (Exception ex)
+        {
+            if (autostartMenuItem is not null) autostartMenuItem.IsChecked = previousState;
+            ShowAutostartError(ex.Message);
+        }
+    }
+
+    void ShowAutostartError(string message)
+    {
+        var window = new Window
+        {
+            Title = "Autostart konnte nicht geändert werden",
+            Width = 420,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(24),
+                Spacing = 18,
+                Children =
+                {
+                    new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                    new Button { Content = "Schließen", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
+                }
+            }
+        };
+        ((Button)((StackPanel)window.Content!).Children[1]).Click += (_, _) => window.Close();
+        window.Show();
     }
 
     void ShowStartupError(IClassicDesktopStyleApplicationLifetime desktop, Exception error)

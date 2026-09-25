@@ -10,6 +10,7 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
     readonly string pipeName = $"jabra-desktop-{GetUserId()}";
     readonly CancellationTokenSource lifetime = new();
     Task? serverTask;
+    bool disposed;
 
     [DllImport("libc", EntryPoint = "getuid")]
     static extern uint GetUserId();
@@ -92,6 +93,8 @@ internal sealed class SingleInstanceCoordinator : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (disposed) return;
+        disposed = true;
         lifetime.Cancel();
         if (serverTask is not null)
         {

@@ -8,6 +8,16 @@ namespace JabraDesktop.App.Views;
 public partial class MainWindow : Window
 {
     public MainWindow() { InitializeComponent(); }
+
+    public void HideToTray() => Hide();
+
+    public void ShowAndActivate()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+    }
+
     public void ToggleTheme(object? sender,RoutedEventArgs e)
     {
         if(Application.Current is {} app) app.RequestedThemeVariant=app.ActualThemeVariant==ThemeVariant.Dark ? ThemeVariant.Light : ThemeVariant.Dark;

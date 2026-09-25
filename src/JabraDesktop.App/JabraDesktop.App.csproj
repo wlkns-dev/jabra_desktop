@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>WinExe</OutputType><AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault></PropertyGroup>
  <ItemGroup>
+  <AvaloniaResource Include="Assets/jabra-desktop.ico" />
   <ProjectReference Include="../JabraDesktop.Core/JabraDesktop.Core.csproj" />
   <ProjectReference Include="../JabraDesktop.Jabra/JabraDesktop.Jabra.csproj" />
   <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
