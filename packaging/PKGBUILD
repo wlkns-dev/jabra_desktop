@@ -1,0 +1,45 @@
+pkgname=jabra-desktop
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Linux desktop application for managing Jabra Link dongles and headsets'
+arch=('x86_64')
+url='https://github.com/wlkns-dev/jabra_desktop'
+license=('custom')
+depends=('glibc' 'gcc-libs' 'icu' 'openssl' 'systemd' 'systemd-libs' 'fontconfig' 'libx11' 'libice' 'libsm')
+options=(!strip)
+source=('jabra-desktop.desktop' 'jabra-desktop.svg' '70-jabra-desktop.rules')
+sha256sums=(
+    '1f96cec8a13323066707331fea0e73dda20c944481be327361511d8d6681f35f'
+    'dc8e70b9758c1807d6f018273cb0c9b79720383f21a631d72dce6429f617129d'
+    'f8ff675c74677a6252ef15289883b5fa62faadfadabbc1e4065e3a97a02860be'
+)
+
+package() {
+    set -o pipefail
+    local publish_dir="${startdir}/../artifacts/linux-x64"
+    [[ -x "${publish_dir}/JabraDesktop.App" ]] || {
+        error 'Missing artifacts/linux-x64. Run ../scripts/publish.sh before makepkg.'
+        return 1
+    }
+
+    install -d "${pkgdir}/opt/jabra-desktop"
+    tar -C "${publish_dir}" \
+        --exclude='./Jabra.Utilities/DeviceConnector/win32' \
+        --exclude='./Jabra.Utilities/DeviceConnector/darwin' \
+        -cf - . | tar -C "${pkgdir}/opt/jabra-desktop" --no-same-owner -xf -
+
+    install -d "${pkgdir}/usr/bin"
+    printf '#!/usr/bin/sh\nexec /opt/jabra-desktop/JabraDesktop.App "\$@"\n' \
+        > "${pkgdir}/usr/bin/jabra-desktop"
+    chmod 0755 "${pkgdir}/usr/bin/jabra-desktop"
+
+    install -Dm0644 "${srcdir}/jabra-desktop.desktop" \
+        "${pkgdir}/usr/share/applications/jabra-desktop.desktop"
+    install -Dm0644 "${srcdir}/jabra-desktop.svg" \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/jabra-desktop.svg"
+    install -Dm0644 "${srcdir}/70-jabra-desktop.rules" \
+        "${pkgdir}/usr/lib/udev/rules.d/70-jabra-desktop.rules"
+
+    install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+    cp -a "${publish_dir}/licenses/." "${pkgdir}/usr/share/licenses/${pkgname}/"
+}

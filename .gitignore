@@ -3,3 +3,7 @@
 **/obj/
 artifacts/
 .superpowers/
+packaging/*.pkg.tar.*
+packaging/src/
+packaging/pkg/
+packaging/*.log
