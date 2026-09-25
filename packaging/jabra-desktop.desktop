@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Jabra Desktop
+Comment=Jabra-Dongle und Headsets verwalten
+Exec=/home/stephan/Projekte/jabra/scripts/run.sh
+Icon=audio-headset
+Terminal=false
+Categories=AudioVideo;Audio;Settings;
+StartupWMClass=JabraDesktop.App

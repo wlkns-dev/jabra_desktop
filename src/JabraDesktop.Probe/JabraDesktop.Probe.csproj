@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../JabraDesktop.Core/JabraDesktop.Core.csproj" /><ProjectReference Include="../JabraDesktop.Jabra/JabraDesktop.Jabra.csproj" /></ItemGroup></Project>

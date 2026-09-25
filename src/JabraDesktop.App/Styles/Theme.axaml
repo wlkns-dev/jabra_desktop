@@ -1,0 +1,25 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Styles.Resources>
+  <ResourceDictionary>
+   <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Dark">
+     <SolidColorBrush x:Key="PageBrush">#101719</SolidColorBrush><SolidColorBrush x:Key="SideBrush">#151F22</SolidColorBrush>
+     <SolidColorBrush x:Key="CardBrush">#1B282C</SolidColorBrush><SolidColorBrush x:Key="MutedBrush">#A7BABF</SolidColorBrush>
+     <SolidColorBrush x:Key="LineBrush">#304247</SolidColorBrush><SolidColorBrush x:Key="AccentBrush">#80D5BB</SolidColorBrush>
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Light">
+     <SolidColorBrush x:Key="PageBrush">#F3F7F6</SolidColorBrush><SolidColorBrush x:Key="SideBrush">#E6EFEC</SolidColorBrush>
+     <SolidColorBrush x:Key="CardBrush">#FFFFFF</SolidColorBrush><SolidColorBrush x:Key="MutedBrush">#50656A</SolidColorBrush>
+     <SolidColorBrush x:Key="LineBrush">#D2DEDA</SolidColorBrush><SolidColorBrush x:Key="AccentBrush">#23785F</SolidColorBrush>
+    </ResourceDictionary>
+   </ResourceDictionary.ThemeDictionaries>
+  </ResourceDictionary>
+ </Styles.Resources>
+ <Style Selector="TextBlock"><Setter Property="FontSize" Value="14" /></Style>
+ <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+ <Style Selector="TextBlock.eyebrow"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="LetterSpacing" Value="2" /></Style>
+ <Style Selector="Border.card"><Setter Property="Background" Value="{DynamicResource CardBrush}" /><Setter Property="CornerRadius" Value="16" /><Setter Property="Padding" Value="20" /><Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" /><Setter Property="BorderThickness" Value="1" /></Style>
+ <Style Selector="Button"><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="16,10" /><Setter Property="Cursor" Value="Hand" /></Style>
+ <Style Selector="Button.primary"><Setter Property="Background" Value="#80D5BB" /><Setter Property="Foreground" Value="#102B24" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+ <Style Selector="ListBoxItem"><Setter Property="CornerRadius" Value="10" /><Setter Property="Padding" Value="12" /><Setter Property="Margin" Value="0,3" /></Style>
+</Styles>

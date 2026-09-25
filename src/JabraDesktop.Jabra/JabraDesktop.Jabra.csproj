@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../JabraDesktop.Core/JabraDesktop.Core.csproj" /><PackageReference Include="Jabra.NET.Sdk" Version="4.9.1.1" /><PackageReference Include="Jabra.NET.Sdk.DevicePairing" Version="3.1.1.2" /></ItemGroup></Project>

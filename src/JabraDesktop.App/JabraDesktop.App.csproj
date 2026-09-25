@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>WinExe</OutputType><AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault></PropertyGroup>
+ <ItemGroup>
+  <ProjectReference Include="../JabraDesktop.Core/JabraDesktop.Core.csproj" />
+  <ProjectReference Include="../JabraDesktop.Jabra/JabraDesktop.Jabra.csproj" />
+  <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
+  <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
+  <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+ </ItemGroup>
+</Project>

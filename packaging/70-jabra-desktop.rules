@@ -1,0 +1,4 @@
+# Allow the active local desktop user to manage Jabra USB devices.
+# Before 73-seat-late.rules so logind applies the uaccess ACL.
+ACTION!="remove", SUBSYSTEM=="usbmisc", KERNEL=="hiddev*", ATTRS{idVendor}=="0b0e", TAG+="uaccess"
+ACTION!="remove", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0b0e", TAG+="uaccess"
