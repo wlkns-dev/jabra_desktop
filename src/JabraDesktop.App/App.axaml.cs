@@ -2,7 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using System.Globalization;
+using System.Windows.Input;
 using JabraDesktop.App.ViewModels;
 using JabraDesktop.App.Views;
 using JabraDesktop.Core;
@@ -14,6 +17,9 @@ public partial class App : Application
 {
     SingleInstanceCoordinator? instanceCoordinator;
     readonly AutostartManager autostartManager = new();
+    readonly AppPreferencesStore preferencesStore = new();
+    AppPreferences preferences = new();
+    LocalizationService localization = new(LocalizationService.DetectLanguage(CultureInfo.CurrentUICulture));
     DeviceSession? session;
     MainViewModel? viewModel;
     MainWindow? mainWindow;
@@ -33,8 +39,10 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
         trayIcon = TrayIcon.GetIcons(this)?.FirstOrDefault();
-        autostartMenuItem = trayIcon?.Menu?.Items.OfType<NativeMenuItem>()
-            .FirstOrDefault(item => Equals(item.Header, "Autostart"));
+        preferences = preferencesStore.Load();
+        localization = new LocalizationService(preferences.Language ?? LocalizationService.DetectLanguage(CultureInfo.CurrentUICulture));
+        RequestedThemeVariant = ToThemeVariant(preferences.Theme);
+        RebuildTrayMenu();
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -61,18 +69,25 @@ public partial class App : Application
                 return;
             }
 
+            var consentCoordinator = new ConsentStartupCoordinator(new TermsConsentGate(preferencesStore, ConsentTerms.CurrentVersion));
+            var backend = await consentCoordinator.CreateBackendIfAcceptedAsync(
+                _ => ShowConsentWindowAsync(desktop),
+                () => new JabraBackend());
+            if (backend is null)
+            {
+                await instanceCoordinator.DisposeAsync();
+                desktop.Shutdown();
+                return;
+            }
+            preferences = preferencesStore.Load();
+
             trayAvailable = await TrayAvailability.IsAvailableAsync(CancellationToken.None);
             if (trayIcon is not null) trayIcon.IsVisible = trayAvailable;
             if (trayAvailable) trayAvailable = await WaitForTrayStatusAsync(trayIcon, CancellationToken.None);
-            if (autostartMenuItem is not null)
-            {
-                autostartMenuItem.IsEnabled = autostartManager.IsAvailable;
-                if (!autostartManager.IsAvailable) autostartMenuItem.Header = "Autostart (nur installiert)";
-                autostartMenuItem.IsChecked = autostartManager.IsEnabled;
-            }
+            RefreshAutostartMenu();
 
-            session = new DeviceSession(new JabraBackend());
-            viewModel = new MainViewModel(session, action => Dispatcher.UIThread.Post(action));
+            session = new DeviceSession(backend);
+            viewModel = new MainViewModel(session, action => Dispatcher.UIThread.Post(action), localization);
             mainWindow = new MainWindow { DataContext = viewModel };
             viewModel.ConfirmUnpair = mainWindow.ConfirmUnpair;
             desktop.MainWindow = mainWindow;
@@ -113,6 +128,121 @@ public partial class App : Application
             await instanceCoordinator.DisposeAsync();
             ShowStartupError(desktop, ex);
         }
+    }
+
+    async Task<bool> ShowConsentWindowAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var language = localization.Language;
+        var window = new ConsentWindow(localization, language);
+        var closed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        window.Closed += (_, _) => closed.TrySetResult(window.Accepted);
+        desktop.MainWindow = window;
+        window.Show();
+        return await closed.Task;
+    }
+
+    void RebuildTrayMenu()
+    {
+        if (trayIcon is null) return;
+        trayIcon.ToolTipText = $"{localization[UiText.AppName]} {AppVersion.Display}";
+        var menu = new NativeMenu();
+        menu.Items.Add(new NativeMenuItem { Header = localization[UiText.Open], Command = new TrayCommand(OpenFromTray) });
+        var language = new NativeMenuItem { Header = localization[UiText.Language], Menu = new NativeMenu() };
+        AddChoice(language.Menu, UiText.German, UiLanguage.German, preferences.Language ?? localization.Language);
+        AddChoice(language.Menu, UiText.English, UiLanguage.English, preferences.Language ?? localization.Language);
+        menu.Items.Add(language);
+        var appearance = new NativeMenuItem { Header = localization[UiText.Appearance], Menu = new NativeMenu() };
+        AddThemeChoice(appearance.Menu, ThemePreference.System);
+        AddThemeChoice(appearance.Menu, ThemePreference.Light);
+        AddThemeChoice(appearance.Menu, ThemePreference.Dark);
+        menu.Items.Add(appearance);
+        menu.Items.Add(new NativeMenuItemSeparator());
+        autostartMenuItem = new NativeMenuItem
+        {
+            Header = autostartManager.IsAvailable ? localization[UiText.Autostart] : localization[UiText.AutostartUnavailable],
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsEnabled = autostartManager.IsAvailable,
+            IsChecked = autostartManager.IsEnabled,
+            Command = new TrayCommand(ToggleAutostart)
+        };
+        menu.Items.Add(autostartMenuItem);
+        menu.Items.Add(new NativeMenuItem { Header = $"Jabra Desktop · {AppVersion.Display}", IsEnabled = false });
+        menu.Items.Add(new NativeMenuItemSeparator());
+        menu.Items.Add(new NativeMenuItem { Header = localization[UiText.Quit], Command = new TrayCommand(QuitFromTray) });
+        trayIcon.Menu = menu;
+    }
+
+    void AddChoice(NativeMenu menu, UiText label, UiLanguage language, UiLanguage selected)
+    {
+        menu.Items.Add(new NativeMenuItem
+        {
+            Header = $"{(selected == language ? "✓ " : "")} {localization[label]}",
+            Command = new TrayCommand(async (_, _) => await SetLanguageAsync(language))
+        });
+    }
+
+    void AddThemeChoice(NativeMenu menu, ThemePreference theme)
+    {
+        var label = theme switch
+        {
+            ThemePreference.System => UiText.System,
+            ThemePreference.Light => UiText.Light,
+            _ => UiText.Dark
+        };
+        menu.Items.Add(new NativeMenuItem
+        {
+            Header = $"{(preferences.Theme == theme ? "✓ " : "")} {localization[label]}",
+            Command = new TrayCommand(async (_, _) => await SetThemeAsync(theme))
+        });
+    }
+
+    async Task SetLanguageAsync(UiLanguage language)
+    {
+        var updated = preferences with { Language = language };
+        try
+        {
+            preferencesStore.Save(updated);
+            preferences = updated;
+            localization.SetLanguage(language);
+            RebuildTrayMenu();
+        }
+        catch (Exception error) { ShowAutostartError(localization[UiText.SettingsSaveFailure] + "\n" + error.Message); }
+        await Task.CompletedTask;
+    }
+
+    async Task SetThemeAsync(ThemePreference theme)
+    {
+        var updated = preferences with { Theme = theme };
+        try
+        {
+            preferencesStore.Save(updated);
+            preferences = updated;
+            RequestedThemeVariant = ToThemeVariant(theme);
+            RebuildTrayMenu();
+        }
+        catch (Exception error) { ShowAutostartError(localization[UiText.SettingsSaveFailure] + "\n" + error.Message); }
+        await Task.CompletedTask;
+    }
+
+    static ThemeVariant ToThemeVariant(ThemePreference theme) => theme switch
+    {
+        ThemePreference.Light => ThemeVariant.Light,
+        ThemePreference.Dark => ThemeVariant.Dark,
+        _ => ThemeVariant.Default
+    };
+
+    void RefreshAutostartMenu()
+    {
+        if (autostartMenuItem is null) return;
+        autostartMenuItem.IsEnabled = autostartManager.IsAvailable;
+        autostartMenuItem.IsChecked = autostartManager.IsEnabled;
+    }
+
+    sealed class TrayCommand(Action<object?, EventArgs> action) : ICommand
+    {
+        event EventHandler? ICommand.CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => action(null, EventArgs.Empty);
     }
 
     Task QueueActivation()
@@ -190,7 +320,7 @@ public partial class App : Application
     {
         var window = new Window
         {
-            Title = "Autostart konnte nicht geändert werden",
+            Title = localization[UiText.AutostartErrorTitle],
             Width = 420,
             SizeToContent = SizeToContent.Height,
             CanResize = false,
@@ -201,7 +331,7 @@ public partial class App : Application
                 Children =
                 {
                     new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                    new Button { Content = "Schließen", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
+                    new Button { Content = localization[UiText.Close], HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
                 }
             }
         };
@@ -213,7 +343,7 @@ public partial class App : Application
     {
         var window = new Window
         {
-            Title = "Jabra Desktop konnte nicht starten",
+            Title = localization[UiText.StartupErrorTitle],
             Width = 460,
             SizeToContent = SizeToContent.Height,
             CanResize = false,
@@ -223,8 +353,8 @@ public partial class App : Application
                 Spacing = 18,
                 Children =
                 {
-                    new TextBlock { Text = error.Message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                    new Button { Content = "Schließen", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
+                    new TextBlock { Text = error is IOException or UnauthorizedAccessException ? localization[UiText.ConsentStorageFailure] : error.Message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                    new Button { Content = localization[UiText.Close], HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
                 }
             }
         };

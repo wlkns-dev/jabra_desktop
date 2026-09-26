@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>WinExe</OutputType><AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault></PropertyGroup>
  <ItemGroup>
+  <EmbeddedResource Include="Resources/Terms.de.md" LogicalName="JabraDesktop.App.Resources.Terms.de.md" WithCulture="false" />
+  <EmbeddedResource Include="Resources/Terms.en.md" LogicalName="JabraDesktop.App.Resources.Terms.en.md" WithCulture="false" />
   <AvaloniaResource Include="Assets/jabra-desktop.ico" />
   <ProjectReference Include="../JabraDesktop.Core/JabraDesktop.Core.csproj" />
   <ProjectReference Include="../JabraDesktop.Jabra/JabraDesktop.Jabra.csproj" />
