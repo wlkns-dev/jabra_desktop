@@ -10,7 +10,16 @@ try
     await backend.StartAsync(CancellationToken.None);
     await Task.Delay(3500);
     var command=args.FirstOrDefault() ?? "list";
-    foreach(var d in devices) Console.WriteLine($"{d.Id}  {d.Name}  {(d.CanPair ? "Bluetooth-Verwaltung" : "Gerät")}");
+    var dongleIndex=0;
+    for(var deviceIndex=0;deviceIndex<devices.Count;deviceIndex++)
+    {
+        var device=devices[deviceIndex];
+        var identity=device.VendorId is > 0 && device.ProductId is > 0
+            ? $"VID {device.VendorId.Value:X4} · PID {device.ProductId.Value:X4}"
+            : "USB-ID nicht verfügbar";
+        var management=device.CanPair ? $"Bluetooth-Verwaltung, Dongle-Index {dongleIndex++}" : "keine Dongle-Verwaltung";
+        Console.WriteLine($"Gerät {deviceIndex}: {device.Name} · {device.Role} · {identity} · {management}");
+    }
     if(command=="list") return devices.Count>0 ? 0 : 2;
     // IDs are session-local. A CLI invocation selects a dongle by list index (default 0).
     var dongles=devices.Where(d=>d.CanPair).ToArray();

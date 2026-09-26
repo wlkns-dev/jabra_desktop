@@ -1,5 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- xmlns:vm="using:JabraDesktop.App.ViewModels" xmlns:core="using:JabraDesktop.Core"
+ xmlns:vm="using:JabraDesktop.App.ViewModels"
  x:Class="JabraDesktop.App.Views.MainWindow" x:DataType="vm:MainViewModel"
  Title="{Binding Texts[AppName]}" Width="1080" Height="760" MinWidth="780" MinHeight="560"
  Background="{DynamicResource PageBrush}" FontFamily="Inter, Noto Sans, DejaVu Sans">
@@ -34,8 +34,12 @@
     </StackPanel>
     <TextBlock Grid.Row="1" Text="{Binding Texts[DevicesSection]}" Classes="eyebrow" Margin="10,0,0,12" />
     <ListBox Grid.Row="2" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" Background="Transparent" BorderThickness="0">
-     <ListBox.ItemTemplate><DataTemplate x:DataType="core:DeviceInfo">
-      <StackPanel Spacing="5"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="Jabra USB" Classes="muted" FontSize="11" /></StackPanel>
+     <ListBox.ItemTemplate><DataTemplate x:DataType="vm:DeviceListItemViewModel">
+      <StackPanel Spacing="4">
+       <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+       <TextBlock Text="{Binding RoleLabel}" Classes="muted" FontSize="11" />
+       <TextBlock Text="{Binding IdentifierText}" IsVisible="{Binding HasIdentifier}" Classes="muted" FontSize="10" />
+      </StackPanel>
      </DataTemplate></ListBox.ItemTemplate>
     </ListBox>
     <StackPanel Grid.Row="3" Spacing="14">

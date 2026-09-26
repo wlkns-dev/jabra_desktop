@@ -10,25 +10,25 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     readonly DeviceSession session;
     readonly Action<Action> dispatch;
     readonly LocalizationService texts;
-    DeviceInfo? selectedDevice;
+    DeviceListItemViewModel? selectedDevice;
     bool syncing,disposed,isScanning,hasSearched;
-    public ObservableCollection<DeviceInfo> Devices { get; }=[];
+    public ObservableCollection<DeviceListItemViewModel> Devices { get; }=[];
     public ObservableCollection<PeerRow> Peers { get; }=[];
     public ObservableCollection<PeerRow> Results { get; }=[];
     public LocalizationService Texts => texts;
     public Func<string,Task<bool>> ConfirmUnpair { get; set; } = _ => Task.FromResult(false);
-    public DeviceInfo? SelectedDevice
+    public DeviceListItemViewModel? SelectedDevice
     {
         get=>selectedDevice;
         set
         {
             if(syncing || !SetProperty(ref selectedDevice,value)) return;
-            session.Select(value?.Id);
-            if(value?.CanPair==true) _=session.RefreshAsync();
+            session.Select(value?.Device.Id);
+            if(value?.Device.CanPair==true) _=session.RefreshAsync();
             NotifyState();
         }
     }
-    public bool CanScan => selectedDevice?.CanPair==true && !session.IsBusy;
+    public bool CanScan => selectedDevice?.Device.CanPair==true && !session.IsBusy;
     public bool IsBusy => session.IsBusy;
     public bool IsScanning { get=>isScanning; private set { SetProperty(ref isScanning,value); OnPropertyChanged(nameof(ShowSearch)); } }
     public bool ShowSearch => hasSearched || IsScanning || Results.Count>0;
@@ -37,15 +37,15 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         : Results.Count == 1 ? texts.Format(UiText.SearchFoundOne, Results.Count)
         : texts.Format(UiText.SearchFoundMany, Results.Count);
     public bool HasDevice => selectedDevice!=null;
-    public bool HasDongle => selectedDevice?.CanPair==true;
+    public bool HasDongle => selectedDevice?.Device.CanPair==true;
     public bool NoPeers => HasDongle && Peers.Count==0;
     public string DeviceTitle => selectedDevice?.Name ?? texts[UiText.DeviceTitleFallback];
     public string DeviceSubtitle => selectedDevice == null ? texts[UiText.PlugInDongle]
-        : HasDongle ? texts[UiText.BluetoothDongleSubtitle] : texts[UiText.UsbDeviceSubtitle];
+        : $"{selectedDevice.RoleLabel} · {texts[HasDongle ? UiText.BluetoothDongleSubtitle : UiText.UsbDeviceSubtitle]}";
     public string StatusText => IsScanning ? texts[UiText.SearchingPairingMode] : IsBusy ? texts[UiText.DeviceActionRunning]
         : HasDongle ? texts[UiText.ReadyToConnect] : texts[UiText.DeviceOverview];
-    public string BatteryText => selectedDevice?.BatteryPercent is { } n ? $"{n} %" : texts[UiText.BatteryUnavailable];
-    public string FirmwareText => selectedDevice?.Firmware ?? texts[UiText.FirmwareUnavailable];
+    public string BatteryText => selectedDevice?.Device.BatteryPercent is { } n ? $"{n} %" : texts[UiText.BatteryUnavailable];
+    public string FirmwareText => selectedDevice?.Device.Firmware ?? texts[UiText.FirmwareUnavailable];
     public string? Error => texts.TranslateSessionError(session.Error);
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
     public IAsyncRelayCommand ScanCommand { get; }
@@ -77,6 +77,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     {
         if (disposed) return;
         NotifyState();
+        foreach (var device in Devices) device.NotifyLocalizationChanged();
         foreach (var row in Peers.Concat(Results)) row.NotifyLocalizationChanged();
     });
     void Sync()
@@ -88,22 +89,41 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             var old=selectedDevice;
             var snapshot=session.Devices;
-            if(!Devices.SequenceEqual(snapshot)) { Devices.Clear(); foreach(var d in snapshot) Devices.Add(d); }
-            var candidate=snapshot.FirstOrDefault(d=>d.Id==session.SelectedId);
+            ReplaceDevices(snapshot);
+            var candidate=Devices.FirstOrDefault(d=>d.Device.Id==session.SelectedId);
             if(candidate==null && snapshot.Count>0)
             {
-                candidate=snapshot.FirstOrDefault(d=>d.CanPair) ?? snapshot[0];
-                session.Select(candidate.Id);
+                candidate=Devices.FirstOrDefault(d=>d.Device.CanPair) ?? Devices[0];
+                session.Select(candidate.Device.Id);
             }
-            selectedDevice=old!=null && Equals(old,candidate) ? old : candidate;
-            refresh=selectedDevice?.CanPair==true && (old?.Id!=selectedDevice.Id || old.CanPair==false);
-            if(!Equals(old,selectedDevice)) OnPropertyChanged(nameof(SelectedDevice));
+            selectedDevice=candidate;
+            refresh=selectedDevice?.Device.CanPair==true && (old?.Device.Id!=selectedDevice.Device.Id || old?.Device.CanPair==false);
+            if(!ReferenceEquals(old,selectedDevice)) OnPropertyChanged(nameof(SelectedDevice));
             ReplaceRows(Peers,session.Peers,false);
             ReplaceRows(Results,session.Results,true);
             NotifyState();
         }
         finally { syncing=false; }
         if(refresh) _=session.RefreshAsync();
+    }
+    void ReplaceDevices(IReadOnlyList<DeviceInfo> source)
+    {
+        var liveIds=source.Select(d=>d.Id).ToHashSet(StringComparer.Ordinal);
+        for(var i=Devices.Count-1;i>=0;i--)
+            if(!liveIds.Contains(Devices[i].Device.Id)) Devices.RemoveAt(i);
+        for(var target=0;target<source.Count;target++)
+        {
+            var info=source[target];
+            var existingIndex=-1;
+            for(var i=0;i<Devices.Count;i++)
+                if(Devices[i].Device.Id==info.Id) { existingIndex=i; break; }
+            if(existingIndex<0) Devices.Insert(target,new DeviceListItemViewModel(info,texts));
+            else
+            {
+                Devices[existingIndex].Update(info);
+                if(existingIndex!=target) Devices.Move(existingIndex,target);
+            }
+        }
     }
     void ReplaceRows(ObservableCollection<PeerRow> rows,IReadOnlyList<PeerInfo> source,bool found)
     {

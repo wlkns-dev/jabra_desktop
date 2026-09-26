@@ -52,12 +52,50 @@ public sealed class LocalizationServiceTests
             Assert.False(string.IsNullOrWhiteSpace(UiTextCatalog.Get(language, key)), $"Missing {language} translation for {key}.");
     }
 
+    [Theory]
+    [InlineData(UiLanguage.German, DeviceRole.Dongle, "Bluetooth-Dongle")]
+    [InlineData(UiLanguage.English, DeviceRole.Dongle, "Bluetooth dongle")]
+    [InlineData(UiLanguage.German, DeviceRole.Headset, "Headset")]
+    [InlineData(UiLanguage.English, DeviceRole.Headset, "Headset")]
+    [InlineData(UiLanguage.German, DeviceRole.Other, "Jabra-Gerät")]
+    [InlineData(UiLanguage.English, DeviceRole.Other, "Jabra device")]
+    [InlineData(UiLanguage.German, DeviceRole.Unknown, "Unbekannter Gerätetyp")]
+    [InlineData(UiLanguage.English, DeviceRole.Unknown, "Unknown device type")]
+    public void DeviceRoleLabelUsesTheSelectedLanguage(UiLanguage language, DeviceRole role, string expected)
+    {
+        var texts=new LocalizationService(language);
+        var item=new DeviceListItemViewModel(new DeviceInfo("id","Jabra",false,Role:role),texts);
+
+        Assert.Equal(expected,item.RoleLabel);
+    }
+
+    [Fact]
+    public void DeviceIdentifierIsFormattedOnlyWhenBothIdsAreAvailable()
+    {
+        var texts=new LocalizationService(UiLanguage.German);
+        var complete=new DeviceListItemViewModel(new DeviceInfo("id","Link",true,VendorId:2830,ProductId:9415),texts);
+        var missingVendor=new DeviceListItemViewModel(new DeviceInfo("id2","Link",true,ProductId:9415),texts);
+        var missingProduct=new DeviceListItemViewModel(new DeviceInfo("id3","Link",true,VendorId:2830),texts);
+
+        Assert.Equal("VID 0B0E · PID 24C7",complete.IdentifierText);
+        Assert.True(complete.HasIdentifier);
+        Assert.Equal(string.Empty,missingVendor.IdentifierText);
+        Assert.False(missingVendor.HasIdentifier);
+        Assert.Equal(string.Empty,missingProduct.IdentifierText);
+        Assert.False(missingProduct.HasIdentifier);
+    }
+
     [Fact]
     public async Task ViewModelAndPeerLabelsUpdateWithoutRecreatingTheWindow()
     {
         var texts = new LocalizationService(UiLanguage.German);
-        await using var session = new DeviceSession(new FakeBackend());
+        var backend=new FakeBackend();
+        await using var session = new DeviceSession(backend);
         using var viewModel = new MainViewModel(session, action => action(), texts);
+        backend.EmitDevices(new DeviceInfo("dongle","Link 380",true,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415));
+        var deviceRow=Assert.Single(viewModel.Devices);
+        var deviceRowChanges=new List<string?>();
+        deviceRow.PropertyChanged += (_,args)=>deviceRowChanges.Add(args.PropertyName);
         var row = new PeerRow(new PeerInfo("peer", "Headset", LinkState.Disconnected), found: false, viewModel);
         viewModel.Peers.Add(row);
         var viewModelChanges = new List<string?>();
@@ -65,18 +103,23 @@ public sealed class LocalizationServiceTests
         viewModel.PropertyChanged += (_, args) => viewModelChanges.Add(args.PropertyName);
         row.PropertyChanged += (_, args) => rowChanges.Add(args.PropertyName);
 
-        Assert.Equal("Deine Geräte, verbunden.", viewModel.DeviceTitle);
-        Assert.Equal("Geräteübersicht", viewModel.StatusText);
+        Assert.Equal("Link 380", viewModel.DeviceTitle);
+        Assert.Equal("Bereit zum Verbinden", viewModel.StatusText);
+        Assert.Equal("Bluetooth-Dongle · Geräteverwaltung verfügbar", viewModel.DeviceSubtitle);
         Assert.Equal("Verbinden", row.ActionLabel);
         Assert.Equal("Nicht verbunden", row.Status);
+        Assert.Equal("Bluetooth-Dongle", deviceRow.RoleLabel);
 
         texts.SetLanguage(UiLanguage.English);
 
-        Assert.Equal("Your connected devices.", viewModel.DeviceTitle);
-        Assert.Equal("Device overview", viewModel.StatusText);
+        Assert.Equal("Link 380", viewModel.DeviceTitle);
+        Assert.Equal("Ready to connect", viewModel.StatusText);
+        Assert.Equal("Bluetooth dongle · Device management available", viewModel.DeviceSubtitle);
         Assert.Equal("Connect", row.ActionLabel);
         Assert.Equal("Disconnected", row.Status);
+        Assert.Equal("Bluetooth dongle", deviceRow.RoleLabel);
         Assert.Contains(nameof(MainViewModel.DeviceTitle), viewModelChanges);
+        Assert.Contains(nameof(DeviceListItemViewModel.RoleLabel), deviceRowChanges);
         Assert.Contains(nameof(PeerRow.ActionLabel), rowChanges);
         Assert.Contains(nameof(PeerRow.Status), rowChanges);
     }

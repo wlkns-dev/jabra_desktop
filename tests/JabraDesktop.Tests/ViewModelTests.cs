@@ -14,6 +14,26 @@ public class ViewModelTests
         var b=new FakeBackend(); var vm=new MainViewModel(new(b),a=>a());
         b.EmitDevices(new DeviceInfo("usb","Headset",false)); Assert.False(vm.CanScan);
     }
+    [Fact] public void DeviceRoleDoesNotGrantPairingCapability()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75",false,Role:DeviceRole.Headset,VendorId:2830,ProductId:1234));
+
+        Assert.Equal("headset",session.SelectedId);
+        Assert.Equal("Headset",Assert.Single(vm.Devices).RoleLabel);
+        Assert.False(vm.CanScan);
+    }
+    [Fact] public void DuplicateDeviceRowsRemainSelectableWhenNamesAndIdsMatch()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(
+            new DeviceInfo("one","Link 380",true,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415),
+            new DeviceInfo("two","Link 380",true,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415));
+
+        Assert.Equal(2,vm.Devices.Count);
+        vm.SelectedDevice=vm.Devices.Single(d=>d.Device.Id=="two");
+        Assert.Equal("two",session.SelectedId);
+    }
     [Fact] public async Task StartFailureIsVisible()
     {
         var b=new FakeBackend{NextError=new UnauthorizedAccessException()}; var vm=new MainViewModel(new(b),a=>a());
