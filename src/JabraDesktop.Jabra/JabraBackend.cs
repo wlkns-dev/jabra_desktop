@@ -18,7 +18,10 @@ public sealed class JabraBackend : IDeviceBackend
         public IBluetoothDongle? Dongle { get; set; }
         public RetryableInitialization<IBluetoothDongle?> Capability { get; } = new();
         public ConcurrentDictionary<string,IBluetoothAddress> Addresses { get; } = new();
-        public DeviceInfo Info => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null);
+        public DeviceInfo Info => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,
+            Role:DeviceMapper.Role(Source.Type),
+            VendorId:DeviceMapper.OptionalUsbId(Source.VendorId),
+            ProductId:DeviceMapper.OptionalUsbId(Source.ProductId));
     }
     readonly object gate=new();
     readonly Dictionary<string,DeviceEntry> entries=[];

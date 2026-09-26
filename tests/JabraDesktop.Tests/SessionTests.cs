@@ -12,6 +12,16 @@ public class SessionTests
     }
     [Fact] public void SameNamesRemainSeparate()
     { var (b,s)=Setup(); Assert.Equal(2,s.Devices.Count); s.Select("b"); Assert.Equal("b",s.SelectedId); }
+    [Fact] public void SameDeviceModelAndUsbIdsRemainIndependentlySelectable()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        var first=new DeviceInfo("first","Link 380",true,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415);
+        var second=new DeviceInfo("second","Link 380",true,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415);
+        backend.EmitDevices(first,second);
+        Assert.Equal(2,session.Devices.Count);
+        session.Select("second");
+        Assert.Equal("second",session.SelectedId);
+    }
     [Fact] public async Task ScanDeduplicatesById()
     {
         var (b,s)=Setup(); b.Scan.Writer.TryWrite(new("p","Name",LinkState.Unknown));
