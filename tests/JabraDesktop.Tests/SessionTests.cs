@@ -40,8 +40,10 @@ public class SessionTests
     {
         var (b,s)=Setup(); await s.RefreshAsync(); b.OperationCompletion=new();
         var first=s.RunAsync("p",DeviceAction.Connect); s.Select("b"); s.Select("a");
-        await s.RunAsync("p",DeviceAction.Disconnect); Assert.Single(b.Calls);
-        b.OperationCompletion.SetResult(); await first;
+        var second=s.RunAsync("p",DeviceAction.Disconnect);
+        Assert.False(second.IsCompleted); Assert.Single(b.Calls);
+        b.OperationCompletion.SetResult(); await Task.WhenAll(first,second);
+        Assert.Single(b.Calls);
     }
     [Fact] public async Task SelectedDongleReceivesAction()
     {

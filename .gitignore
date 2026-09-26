@@ -1,6 +1,7 @@
 .tools/
 **/bin/
 **/obj/
+**/TestResults/
 artifacts/
 .superpowers/
 packaging/*.pkg.tar.*

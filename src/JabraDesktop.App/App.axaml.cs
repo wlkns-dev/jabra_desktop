@@ -63,6 +63,7 @@ public partial class App : Application
 
             trayAvailable = await TrayAvailability.IsAvailableAsync(CancellationToken.None);
             if (trayIcon is not null) trayIcon.IsVisible = trayAvailable;
+            if (trayAvailable) trayAvailable = await WaitForTrayStatusAsync(trayIcon, CancellationToken.None);
             if (autostartMenuItem is not null)
             {
                 autostartMenuItem.IsEnabled = autostartManager.IsAvailable;
@@ -93,8 +94,14 @@ public partial class App : Application
             {
                 if (shutdownRequested) return;
                 e.Cancel = true;
-                if (trayAvailable) mainWindow.HideToTray();
-                else _ = ShutdownAndExitAsync();
+                if (!trayAvailable)
+                {
+                    _ = ShutdownAndExitAsync();
+                    return;
+                }
+
+                if (TrayStatusCompatibility.TrySetActive(trayIcon)) mainWindow.HideToTray();
+                else trayAvailable = false;
             };
 
             mainWindow.Show();
@@ -138,12 +145,30 @@ public partial class App : Application
         try
         {
             var available = await TrayAvailability.IsAvailableAsync(CancellationToken.None);
+            if (available)
+            {
+                if (trayIcon is not null) trayIcon.IsVisible = true;
+                available = TrayStatusCompatibility.TrySetActive(trayIcon);
+            }
+            else if (trayIcon is not null)
+            {
+                trayIcon.IsVisible = false;
+            }
             if (available == trayAvailable) return;
             trayAvailable = available;
-            if (trayIcon is not null) trayIcon.IsVisible = available;
             if (!available && mainWindow is { IsVisible: false }) mainWindow.ShowAndActivate();
         }
         finally { trayProbeRunning = false; }
+    }
+
+    static async Task<bool> WaitForTrayStatusAsync(TrayIcon? trayIcon, CancellationToken token)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            if (TrayStatusCompatibility.TrySetActive(trayIcon)) return true;
+            await Task.Delay(TimeSpan.FromMilliseconds(100), token);
+        }
+        return false;
     }
 
     void ToggleAutostart(object? sender, EventArgs e)
