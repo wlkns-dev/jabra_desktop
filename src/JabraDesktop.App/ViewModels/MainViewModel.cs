@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JabraDesktop.App;
 using JabraDesktop.Core;
 namespace JabraDesktop.App.ViewModels;
 
@@ -8,11 +9,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 {
     readonly DeviceSession session;
     readonly Action<Action> dispatch;
+    readonly LocalizationService texts;
     DeviceInfo? selectedDevice;
     bool syncing,disposed,isScanning,hasSearched;
     public ObservableCollection<DeviceInfo> Devices { get; }=[];
     public ObservableCollection<PeerRow> Peers { get; }=[];
     public ObservableCollection<PeerRow> Results { get; }=[];
+    public LocalizationService Texts => texts;
     public Func<string,Task<bool>> ConfirmUnpair { get; set; } = _ => Task.FromResult(false);
     public DeviceInfo? SelectedDevice
     {
@@ -29,26 +32,32 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool IsBusy => session.IsBusy;
     public bool IsScanning { get=>isScanning; private set { SetProperty(ref isScanning,value); OnPropertyChanged(nameof(ShowSearch)); } }
     public bool ShowSearch => hasSearched || IsScanning || Results.Count>0;
-    public string SearchSummary => IsScanning ? "Suche läuft …" : Results.Count==0 ? "Keine Geräte gefunden. Prüfe den Pairing-Modus und starte die Suche erneut." : $"{Results.Count} Gerät(e) gefunden. Wähle ein Gerät zum Koppeln.";
+    public string SearchSummary => IsScanning ? texts[UiText.SearchingPairingMode]
+        : Results.Count == 0 ? texts[UiText.SearchNoDevices]
+        : Results.Count == 1 ? texts.Format(UiText.SearchFoundOne, Results.Count)
+        : texts.Format(UiText.SearchFoundMany, Results.Count);
     public bool HasDevice => selectedDevice!=null;
     public bool HasDongle => selectedDevice?.CanPair==true;
     public bool NoPeers => HasDongle && Peers.Count==0;
-    public string DeviceTitle => selectedDevice?.Name ?? "Deine Geräte, verbunden.";
-    public string DeviceSubtitle => selectedDevice==null ? "Stecke deinen Jabra-Dongle ein, um loszulegen."
-        : HasDongle ? "Bluetooth-Dongle · Geräteverwaltung" : "Jabra-Gerät · Über USB oder Dongle verbunden";
-    public string StatusText => IsScanning ? "Suche nach Geräten im Pairing-Modus …" : IsBusy ? "Geräteaktion läuft …"
-        : HasDongle ? "Bereit zum Verbinden" : "Geräteübersicht";
-    public string BatteryText => selectedDevice?.BatteryPercent is {} n ? $"{n} %" : "Nicht verfügbar";
-    public string FirmwareText => selectedDevice?.Firmware ?? "Nicht verfügbar";
-    public string? Error => session.Error;
+    public string DeviceTitle => selectedDevice?.Name ?? texts[UiText.DeviceTitleFallback];
+    public string DeviceSubtitle => selectedDevice == null ? texts[UiText.PlugInDongle]
+        : HasDongle ? texts[UiText.BluetoothDongleSubtitle] : texts[UiText.UsbDeviceSubtitle];
+    public string StatusText => IsScanning ? texts[UiText.SearchingPairingMode] : IsBusy ? texts[UiText.DeviceActionRunning]
+        : HasDongle ? texts[UiText.ReadyToConnect] : texts[UiText.DeviceOverview];
+    public string BatteryText => selectedDevice?.BatteryPercent is { } n ? $"{n} %" : texts[UiText.BatteryUnavailable];
+    public string FirmwareText => selectedDevice?.Firmware ?? texts[UiText.FirmwareUnavailable];
+    public string? Error => texts.TranslateSessionError(session.Error);
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
     public IAsyncRelayCommand ScanCommand { get; }
     public IRelayCommand CancelScanCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand RetryCommand { get; }
-    public MainViewModel(DeviceSession session,Action<Action> dispatch)
+    public MainViewModel(DeviceSession session, Action<Action> dispatch, LocalizationService? texts = null)
     {
-        this.session=session; this.dispatch=dispatch;
+        this.session = session;
+        this.dispatch = dispatch;
+        this.texts = texts ?? new LocalizationService(UiLanguage.German);
+        this.texts.LanguageChanged += OnLanguageChanged;
         ScanCommand=new AsyncRelayCommand(async ()=>
         {
             hasSearched=true; IsScanning=true;
@@ -64,6 +73,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public Task StartAsync()=>session.StartAsync();
     public Task RefreshAsync()=>session.RefreshAsync();
     void OnChanged()=>dispatch(()=> { if(!disposed) Sync(); });
+    void OnLanguageChanged(object? sender, EventArgs e) => dispatch(() =>
+    {
+        if (disposed) return;
+        NotifyState();
+        foreach (var row in Peers.Concat(Results)) row.NotifyLocalizationChanged();
+    });
     void Sync()
     {
         if(syncing) return;
@@ -108,19 +123,25 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if(action==DeviceAction.Unpair && !await ConfirmUnpair(peer.Name)) return;
         await session.RunAsync(peer.Id,action);
     }
-    public void Dispose() { disposed=true; session.Changed-=OnChanged; }
+    public void Dispose()
+    {
+        disposed = true;
+        session.Changed -= OnChanged;
+        texts.LanguageChanged -= OnLanguageChanged;
+    }
 }
 public sealed class PeerRow : ObservableObject
 {
     readonly MainViewModel owner;
     public PeerInfo Peer { get; }
+    public LocalizationService Texts => owner.Texts;
     public string Name=>Peer.Name;
     public bool IsFound { get; }
     public bool IsSaved=>!IsFound;
     public bool Connected=>Peer.State==LinkState.Connected;
-    public string Status=>IsFound ? "Zum Koppeln verfügbar" : Peer.State switch
-    { LinkState.Connected=>"Verbunden",LinkState.Disconnected=>"Nicht verbunden",_=>"Status unbekannt" };
-    public string ActionLabel=>IsFound ? "Koppeln" : Connected ? "Trennen" : "Verbinden";
+    public string Status=>IsFound ? owner.Texts[UiText.FoundForPairing] : Peer.State switch
+    { LinkState.Connected=>owner.Texts[UiText.Connected],LinkState.Disconnected=>owner.Texts[UiText.Disconnected],_=>owner.Texts[UiText.UnknownStatus] };
+    public string ActionLabel=>IsFound ? owner.Texts[UiText.Pair] : Connected ? owner.Texts[UiText.Disconnect] : owner.Texts[UiText.Connect];
     public IAsyncRelayCommand ActionCommand { get; }
     public IAsyncRelayCommand UnpairCommand { get; }
     public PeerRow(PeerInfo peer,bool found,MainViewModel owner)
@@ -130,4 +151,9 @@ public sealed class PeerRow : ObservableObject
         UnpairCommand=new AsyncRelayCommand(()=>owner.ActAsync(peer,DeviceAction.Unpair),()=>owner.CanScan);
     }
     public void NotifyEnabled() { ActionCommand.NotifyCanExecuteChanged(); UnpairCommand.NotifyCanExecuteChanged(); }
+    public void NotifyLocalizationChanged()
+    {
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(ActionLabel));
+    }
 }
