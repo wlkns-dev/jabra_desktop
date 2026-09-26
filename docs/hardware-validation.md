@@ -36,3 +36,17 @@ Release-Tests: 29 bestanden, 0 fehlgeschlagen. Unabhängiger Code-Review abgesch
 Finales eigenständiges Linux-Paket gestartet und Fenster erneut geprüft: Darstellung unter Software-Rendering läuft. Beim späteren Screenshot war wieder Evolve HO verbunden; die App zeigt den jeweils vom Dongle gelieferten Zustand. Die erfolgreiche Kopplung von Evolve 75 wurde unmittelbar durch erneutes Auslesen bestätigt, eine dauerhafte Priorisierung bestimmter Headsets ist nicht implementiert.
 
 Offener kleiner UI-Punkt: Beim Wechsel des ausgewählten Dongles während einer laufenden Suche kann die Suchanzeige bis zum Ende des Abbruchs kurz sichtbar bleiben. Geräteaktionen sind weiterhin gesperrt und dem richtigen Dongle zugeordnet.
+
+## Gerätebestand-Release 0.3.0 – Prüfung am 27.09.2026
+
+System: CachyOS x86_64, Kernel `7.2.7-1-cachyos`, KDE. Jabra SDK `4.9.1.1`, DevicePairing `3.1.1.2`, Device Connector Linux `2.1.5`. Kein Partner-Key gesetzt.
+
+| Dongle | Angeschlossenes USB-Gerät | SDK-Rolle und VID:PID | Geräteverwaltung | Kopplungsliste | Suche/Pair-Aktionen |
+|---|---|---|---|---|---|
+| Link 380, Variante UC/MS nicht ermittelt | Evolve 75 SE | Dongle `0B0E:24C7`; Headset `0B0E:2502` | Bestanden | Bestanden, vier Einträge; ein verbundener | In dieser Bestandsaufnahme nicht ausgeführt; Pair/Connect/Disconnect wurden in der obigen Hardwareprüfung erfolgreich getestet |
+| Link 370 | — | — | Nicht getestet; bei der Prüfung nicht angeschlossen | Nicht getestet | Nicht getestet |
+| Link 370 und Link 380 gleichzeitig | — | — | Nicht getestet | Nicht getestet | Nicht getestet |
+
+Der aktuelle Link-380-Probe-Lauf meldete zusätzlich die Kopplungen `Jabra Evolve 75`, `Jabra Evolve HO`, `Evolve 1` und `SW - Jabra Speak 710`; nur `Evolve 1` war dabei als verbunden gemeldet. Die automatische Suche wurde nicht gestartet, weil kein Testgerät absichtlich im Pairing-Modus war. Seriennummern und Bluetooth-Adressen wurden nicht protokolliert.
+
+Die App listet Geräte anhand ihrer SDK-Rolle und VID:PID. Das bestätigt die Geräteerkennung für die oben geprüfte Kombination, aber keine pauschale Kompatibilität aller Link- oder Evolve-Varianten.
