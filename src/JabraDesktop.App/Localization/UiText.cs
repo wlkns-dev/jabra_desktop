@@ -60,6 +60,8 @@ public enum UiText
     DeclineAndExit,
     ConsentStorageFailure,
     SettingsSaveFailure,
+    SettingsErrorTitle,
+    AutostartFailureDetail,
     AutostartUnavailable,
     StartupErrorTitle,
     AutostartErrorTitle,

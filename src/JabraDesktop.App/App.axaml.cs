@@ -312,15 +312,15 @@ public partial class App : Application
         catch (Exception ex)
         {
             if (autostartMenuItem is not null) autostartMenuItem.IsChecked = previousState;
-            ShowAutostartError(ex.Message);
+            ShowAutostartError(localization[UiText.AutostartFailureDetail] + "\n" + ex.Message, localization[UiText.AutostartErrorTitle]);
         }
     }
 
-    void ShowAutostartError(string message)
+    void ShowAutostartError(string message, string? title = null)
     {
         var window = new Window
         {
-            Title = localization[UiText.AutostartErrorTitle],
+            Title = title ?? localization[UiText.SettingsErrorTitle],
             Width = 420,
             SizeToContent = SizeToContent.Height,
             CanResize = false,

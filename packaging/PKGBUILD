@@ -1,5 +1,5 @@
 pkgname=jabra-desktop
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Linux desktop application for managing Jabra Link dongles and headsets'
 arch=('x86_64')
@@ -42,4 +42,8 @@ package() {
 
     install -d "${pkgdir}/usr/share/licenses/${pkgname}"
     cp -a "${publish_dir}/licenses/." "${pkgdir}/usr/share/licenses/${pkgname}/"
+    install -Dm0644 "${startdir}/../src/JabraDesktop.App/Resources/Terms.de.md" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/Terms.de.md"
+    install -Dm0644 "${startdir}/../src/JabraDesktop.App/Resources/Terms.en.md" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/Terms.en.md"
 }

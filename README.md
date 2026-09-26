@@ -44,8 +44,15 @@ die udev-Regeln neu laden und den Dongle erneut anstecken:
 sudo udevadm control --reload-rules
 ```
 
-Das Tray-Menü kann den Autostart für den aktuellen Benutzer ein- und
-ausschalten. „Öffnen“ stellt das Fenster wieder her; „Beenden“ schließt die
+Beim ersten Start zeigt Jabra Desktop die Nutzungsbedingungen für die
+eingebundenen Jabra-Komponenten. Die Geräteverwaltung startet erst nach
+Zustimmung. Die deutsche und englische Fassung wird mit dem Paket unter
+`/usr/share/licenses/jabra-desktop/` installiert.
+
+Das Tray-Menü kann Sprache (Deutsch/English), Darstellung (System/Hell/Dunkel)
+und den Autostart für den aktuellen Benutzer einstellen. Sprache und Darstellung
+werden gespeichert und sofort angewandt. Die Programmversion steht ebenfalls
+im Tray-Menü. „Öffnen“ stellt das Fenster wieder her; „Beenden“ schließt die
 Anwendung vollständig. Ein Fensterschluss blendet sie ins Tray aus, solange
 eine Tray-Umgebung verfügbar ist. Fällt diese weg, wird ein verborgenes Fenster
 wieder eingeblendet und der nächste Fensterschluss beendet die Anwendung.
@@ -54,8 +61,7 @@ Autostart ist standardmäßig aus. Der Eintrag liegt in
 Entfernen des Pakets bleibt diese persönliche Einstellung erhalten und kann bei
 Bedarf manuell gelöscht werden.
 
-Ein lokales Update wird aus einem neueren Checkout gebaut und mit Pacman
-installiert:
+Ein Update aus einem Checkout wird lokal gebaut und mit Pacman installiert:
 
 ```bash
 git pull
@@ -64,13 +70,20 @@ package_file="$(cd packaging && makepkg --packagelist)"
 sudo pacman -U "$package_file"
 ```
 
-Softwarestände verwenden annotierte Git-Tags wie `v0.1.0`. Die Version in
-`Directory.Build.props` und `pkgver` im PKGBUILD müssen dazu passen; für eine
-reine Paketkorrektur wird stattdessen `pkgrel` erhöht. Einen eingebauten
-Updater gibt es nicht. Fertige Pakete sollen später als GitHub Releases
-verfügbar sein, sobald die Weitergabebedingungen der Jabra-SDK-Binärdateien
-geklärt sind. Bis dahin ist lokaler Selbstbau der vorgesehene Weg. AUR und ein
-automatisiertes Pacman-Repository sind noch nicht eingerichtet.
+Fertige Arch-Pakete werden als Assets in den [GitHub Releases](https://github.com/wlkns-dev/jabra_desktop/releases)
+bereitgestellt. Für Release `v0.2.0` lädst du das Paket herunter und installierst
+es zum Beispiel so:
+
+```bash
+curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.2.0/jabra-desktop-0.2.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./jabra-desktop-0.2.0-1-x86_64.pkg.tar.zst
+```
+
+Softwarestände verwenden annotierte Git-Tags wie `v0.2.0`. Die Version in
+`Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
+für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater
+gibt es nicht. AUR und ein automatisiertes Pacman-Repository sind noch nicht
+eingerichtet.
 
 Deinstallation:
 
@@ -162,5 +175,6 @@ Zum Koppeln neuer Geräte bevorzugt die grafische Oberfläche verwenden. Alterna
 - Fremdhersteller werden bei Suchtreffern nicht ausgefiltert; Kompatibilität
   ist experimentell. DECT, BlueZ, Firmware-Updates und Audioeinstellungen folgen
   gegebenenfalls separat.
-- Vor öffentlicher Verteilung die Jabra-Weitergabebedingungen klären, siehe
-  `THIRD-PARTY-NOTICES.md`. Das lokale Paket wurde nicht veröffentlicht.
+- Die Nutzungsbedingungen für Jabra-Komponenten stehen in Deutsch und Englisch
+  im installierten Lizenzverzeichnis; Details zu Drittanbieter-Komponenten und
+  offiziellen Jabra-Bedingungen stehen in `THIRD-PARTY-NOTICES.md`.
