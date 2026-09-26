@@ -88,6 +88,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         try
         {
             var old=selectedDevice;
+            var oldDeviceId=old?.Device.Id;
+            var oldCanPair=old?.Device.CanPair;
             var snapshot=session.Devices;
             ReplaceDevices(snapshot);
             var candidate=Devices.FirstOrDefault(d=>d.Device.Id==session.SelectedId);
@@ -97,7 +99,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 session.Select(candidate.Device.Id);
             }
             selectedDevice=candidate;
-            refresh=selectedDevice?.Device.CanPair==true && (old?.Device.Id!=selectedDevice.Device.Id || old?.Device.CanPair==false);
+            refresh=selectedDevice?.Device.CanPair==true && (oldDeviceId!=selectedDevice.Device.Id || oldCanPair==false);
             if(!ReferenceEquals(old,selectedDevice)) OnPropertyChanged(nameof(SelectedDevice));
             ReplaceRows(Peers,session.Peers,false);
             ReplaceRows(Results,session.Results,true);

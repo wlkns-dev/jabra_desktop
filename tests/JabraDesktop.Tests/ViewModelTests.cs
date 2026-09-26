@@ -23,6 +23,17 @@ public class ViewModelTests
         Assert.Equal("Headset",Assert.Single(vm.Devices).RoleLabel);
         Assert.False(vm.CanScan);
     }
+    [Fact] public void NewlyRecognizedDongleRefreshesPeers()
+    {
+        var backend=new FakeBackend { Peers=[new("peer","Evolve 75",LinkState.Disconnected)] };
+        var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link 380",false,Role:DeviceRole.Dongle));
+        Assert.Empty(vm.Peers);
+
+        backend.EmitDevices(new DeviceInfo("dongle","Link 380",true,Role:DeviceRole.Dongle));
+
+        Assert.Equal("Evolve 75",Assert.Single(vm.Peers).Name);
+    }
     [Fact] public void DuplicateDeviceRowsRemainSelectableWhenNamesAndIdsMatch()
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());

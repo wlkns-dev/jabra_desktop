@@ -9,20 +9,21 @@ try
 {
     await backend.StartAsync(CancellationToken.None);
     await Task.Delay(3500);
+    var snapshot=devices;
     var command=args.FirstOrDefault() ?? "list";
     var dongleIndex=0;
-    for(var deviceIndex=0;deviceIndex<devices.Count;deviceIndex++)
+    for(var deviceIndex=0;deviceIndex<snapshot.Count;deviceIndex++)
     {
-        var device=devices[deviceIndex];
+        var device=snapshot[deviceIndex];
         var identity=device.VendorId is > 0 && device.ProductId is > 0
             ? $"VID {device.VendorId.Value:X4} · PID {device.ProductId.Value:X4}"
             : "USB-ID nicht verfügbar";
         var management=device.CanPair ? $"Bluetooth-Verwaltung, Dongle-Index {dongleIndex++}" : "keine Dongle-Verwaltung";
         Console.WriteLine($"Gerät {deviceIndex}: {device.Name} · {device.Role} · {identity} · {management}");
     }
-    if(command=="list") return devices.Count>0 ? 0 : 2;
+    if(command=="list") return snapshot.Count>0 ? 0 : 2;
     // IDs are session-local. A CLI invocation selects a dongle by list index (default 0).
-    var dongles=devices.Where(d=>d.CanPair).ToArray();
+    var dongles=snapshot.Where(d=>d.CanPair).ToArray();
     var index=args.Length>1 && int.TryParse(args[1],out var n) ? n : 0;
     if(index<0 || index>=dongles.Length) return 2;
     var id=dongles[index].Id;
