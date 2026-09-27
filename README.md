@@ -71,15 +71,15 @@ sudo pacman -U "$package_file"
 ```
 
 Fertige Arch-Pakete werden als Assets in den [GitHub Releases](https://github.com/wlkns-dev/jabra_desktop/releases)
-bereitgestellt. Für Release `v0.4.0` lädst du das Paket herunter und installierst
+bereitgestellt. Für Release `v0.4.1` lädst du das Paket herunter und installierst
 es zum Beispiel so:
 
 ```bash
-curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.4.0/jabra-desktop-0.4.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./jabra-desktop-0.4.0-1-x86_64.pkg.tar.zst
+curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.4.1/jabra-desktop-0.4.1-1-x86_64.pkg.tar.zst
+sudo pacman -U ./jabra-desktop-0.4.1-1-x86_64.pkg.tar.zst
 ```
 
-Softwarestände verwenden annotierte Git-Tags wie `v0.4.0`. Die Version in
+Softwarestände verwenden annotierte Git-Tags wie `v0.4.1`. Die Version in
 `Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
 für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater
 gibt es nicht. AUR und ein automatisiertes Pacman-Repository sind noch nicht

@@ -84,7 +84,8 @@ public sealed class DeviceSession : IAsyncDisposable
         return backend.RefreshDevicePropertiesAsync(deviceId,token);
     }
     bool Current(string id,long epoch) => !disposed && selected==id && generation==epoch;
-    async Task WithOperation(Func<string,long,Task> operation, bool clearError = false, bool showActivity = true)
+    async Task WithOperation(Func<string,long,Task> operation, bool clearError = false, bool showActivity = true,
+        CancellationToken operationToken = default)
     {
         string id; long epoch; SemaphoreSlim operationLock;
         lock(gate)
@@ -102,7 +103,8 @@ public sealed class DeviceSession : IAsyncDisposable
             }
         }
         if(id=="") { Changed?.Invoke(); operationLock.Dispose(); return; }
-        try { await operationLock.WaitAsync(); }
+        try { await operationLock.WaitAsync(operationToken); }
+        catch(OperationCanceledException) { return; }
         catch(ObjectDisposedException) { return; }
         bool activity=false;
         try
@@ -126,25 +128,43 @@ public sealed class DeviceSession : IAsyncDisposable
             if(activity) Changed?.Invoke();
         }
     }
-    public Task ScanAsync(CancellationToken token = default) => WithOperation(async (id,epoch) =>
+    public Task ScanAsync(CancellationToken token = default)
     {
-        using var cancel=CancellationTokenSource.CreateLinkedTokenSource(token);
-        cancel.CancelAfter(TimeSpan.FromSeconds(30));
-        lock(gate) { if(!Current(id,epoch)) return; results=[]; scanCancel=cancel; }
+        CancellationTokenSource cancel;
+        lock(gate)
+        {
+            if(disposed) return Task.CompletedTask;
+            scanCancel?.Cancel();
+            cancel=CancellationTokenSource.CreateLinkedTokenSource(token);
+            cancel.CancelAfter(TimeSpan.FromSeconds(30));
+            scanCancel=cancel;
+        }
+        return RunScanAsync(cancel);
+    }
+    async Task RunScanAsync(CancellationTokenSource cancel)
+    {
         try
         {
-            await foreach(var peer in backend.ScanAsync(id,cancel.Token))
+            await WithOperation(async (id,epoch) =>
             {
-                lock(gate)
+                lock(gate) { if(!Current(id,epoch)) return; results=[]; }
+                await foreach(var peer in backend.ScanAsync(id,cancel.Token))
                 {
-                    if(!Current(id,epoch)) break;
-                    results=results.Where(p => p.Id!=peer.Id).Append(peer).ToArray();
+                    lock(gate)
+                    {
+                        if(!Current(id,epoch)) break;
+                        results=results.Where(p => p.Id!=peer.Id).Append(peer).ToArray();
+                    }
+                    Changed?.Invoke();
                 }
-                Changed?.Invoke();
-            }
+            }, clearError: true, operationToken: cancel.Token);
         }
-        finally { lock(gate) if(ReferenceEquals(scanCancel,cancel)) scanCancel=null; }
-    }, clearError: true);
+        finally
+        {
+            lock(gate) if(ReferenceEquals(scanCancel,cancel)) scanCancel=null;
+            cancel.Dispose();
+        }
+    }
     public void CancelScan() { lock(gate) scanCancel?.Cancel(); }
     public Task RunAsync(string peerId, DeviceAction action, CancellationToken token = default) => WithOperation(async (id,epoch) =>
     {

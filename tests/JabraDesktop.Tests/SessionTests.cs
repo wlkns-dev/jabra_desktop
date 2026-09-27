@@ -40,6 +40,33 @@ public class SessionTests
         b.EmitDevices(); await task.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.False(s.IsBusy); Assert.Empty(s.Results); Assert.Null(s.SelectedId);
     }
+    [Fact] public async Task CancelScanWhileQueuedBehindRefreshPreventsStartingIt()
+    {
+        var (b,s)=Setup(); b.ReadCompletion=new();
+        var refresh=s.RefreshAsync();
+        await b.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var scan=s.ScanAsync();
+
+        s.CancelScan();
+        await scan.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(0,b.ScanStarted);
+        b.ReadCompletion.SetResult();
+        await refresh;
+
+        Assert.Equal(0,b.ScanStarted);
+        Assert.False(s.IsBusy);
+    }
+    [Fact] public async Task CancelActiveScanReleasesDeviceSession()
+    {
+        var (b,s)=Setup();
+        var scan=s.ScanAsync();
+        Assert.Equal(1,b.ScanStarted);
+
+        s.CancelScan();
+        await scan.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(s.IsBusy);
+    }
     [Fact] public async Task FailedOperationDoesNotClaimConnection()
     {
         var (b,s)=Setup(); await s.RefreshAsync(); b.NextError=new IOException("USB");
