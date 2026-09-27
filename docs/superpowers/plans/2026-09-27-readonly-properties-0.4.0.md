@@ -225,7 +225,7 @@ Expected: the Linux publish and `jabra-desktop-0.4.0-1-x86_64.pkg.tar.zst` build
 
 Inspect package files and launch the package-built app. Verify DE/EN labels, tray launch, no UI flicker during property refresh, and continued pairing-list refresh. Report hardware properties exactly as the matrix states.
 
-- [ ] **Step 5: Commit release preparation**
+- [x] **Step 5: Commit release preparation**
 
 ```bash
 git add docs/hardware-validation.md docs/releases/v0.4.0.md README.md Directory.Build.props packaging/PKGBUILD
