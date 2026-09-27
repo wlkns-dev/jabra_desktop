@@ -21,7 +21,7 @@ internal sealed class DevicePropertyReadRunner
         lock(gate)
         {
             if(activeRead is { IsCompleted:false }) return null;
-            try { operation=read(); }
+            try { operation=Task.Run(read,CancellationToken.None); }
             catch(Exception) { return null; }
             activeRead=operation;
             _=operation.ContinueWith(completed =>

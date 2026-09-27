@@ -92,6 +92,37 @@ public class DevicePropertyTests
     }
 
     [Fact]
+    public async Task OptionalPropertyInitializationTimeoutIsIsolated()
+    {
+        var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(async () => { await Task.Delay(300); pending.TrySetResult(); });
+        var reader = new FakePropertiesReader { InitializationTask = pending.Task };
+        var timer = Stopwatch.StartNew();
+
+        var initialized = await DevicePropertiesInitialization.TryInitializeAsync(reader, null!, CancellationToken.None, TimeSpan.FromMilliseconds(30));
+
+        Assert.False(initialized);
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(1));
+        Assert.False(reader.GetCalled);
+    }
+
+    [Fact]
+    public async Task SynchronouslyBlockingPropertyCallIsBoundedAndRemainsSingleFlight()
+    {
+        var runner = new DevicePropertyReadRunner(TimeSpan.FromMilliseconds(30));
+        var timer = Stopwatch.StartNew();
+
+        var result = await runner.ReadAsync(() =>
+        {
+            Thread.Sleep(300);
+            return Task.FromResult(PropertyValue.FromString("late"));
+        }, CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.True(timer.Elapsed < TimeSpan.FromMilliseconds(200));
+    }
+
+    [Fact]
     public void RemovedDeviceDoesNotAcceptLatePropertyValue()
     {
         var original = Device(DeviceRole.Headset, 0x0B0E, 0x2502);
@@ -106,12 +137,14 @@ public class DevicePropertyTests
     sealed class FakePropertiesReader : IDevicePropertiesReader
     {
         public Exception? InitializationException { get; init; }
+        public Task? InitializationTask { get; init; }
         public bool InitializeCalled { get; private set; }
         public bool GetCalled { get; private set; }
         public Task InitializeAsync(IApi api, CancellationToken token)
         {
             InitializeCalled = true;
-            return InitializationException is null ? Task.CompletedTask : Task.FromException(InitializationException);
+            if (InitializationException is not null) return Task.FromException(InitializationException);
+            return InitializationTask ?? Task.CompletedTask;
         }
         public Task<PropertyValue> GetAsync(IDevice device, string propertyName, CancellationToken token)
         {
