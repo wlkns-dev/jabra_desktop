@@ -18,21 +18,30 @@ public sealed class JabraBackend : IDeviceBackend
         public IBluetoothDongle? Dongle { get; set; }
         public RetryableInitialization<IBluetoothDongle?> Capability { get; } = new();
         public ConcurrentDictionary<string,IBluetoothAddress> Addresses { get; } = new();
-        public DeviceInfo Info => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,
+        public int? BatteryPercent { get; set; }
+        public string? Firmware { get; set; }
+        public bool CanRefreshProperties { get; set; }
+        public DevicePropertyReadRunner PropertyReadRunner { get; }=new();
+        public DeviceInfo BaseInfo => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,BatteryPercent,Firmware,
             Role:DeviceMapper.Role(Source.Type),
             VendorId:DeviceMapper.OptionalUsbId(Source.VendorId),
             ProductId:DeviceMapper.OptionalUsbId(Source.ProductId));
+        public DeviceInfo Info => BaseInfo with { CanRefreshProperties=CanRefreshProperties };
     }
     readonly object gate=new();
     readonly Dictionary<string,DeviceEntry> entries=[];
     readonly CompositeDisposable subscriptions=new();
     IManualApi? api;
     BluetoothModule? module;
+    readonly IDevicePropertiesReader propertiesReader;
+    bool propertiesInitialized;
     bool disposed;
     readonly RetryableInitialization<bool> initialization=new();
     readonly SnapshotPublisher<DeviceInfo[]> publisher=new();
     public event Action<IReadOnlyList<DeviceInfo>>? DevicesChanged;
     public event Action<string>? Faulted;
+    public JabraBackend() : this(new JabraPropertiesReader()) { }
+    internal JabraBackend(IDevicePropertiesReader propertiesReader) => this.propertiesReader=propertiesReader;
     public async Task StartAsync(CancellationToken token)
     {
         if(disposed) throw new ObjectDisposedException(nameof(JabraBackend));
@@ -54,10 +63,20 @@ public sealed class JabraBackend : IDeviceBackend
         }
         var start=initialization.Run(async ()=> { await api.Start(); return true; });
         await SdkLifetime.AwaitCompletion(start,TimeSpan.FromSeconds(15),SlowOperation);
+        var propertyModuleReady=await DevicePropertiesInitialization.TryInitializeAsync(propertiesReader,api,token);
+        lock(gate) propertiesInitialized=propertyModuleReady;
         DeviceEntry[] retry;
         lock(gate) retry=entries.Values.Where(e=>e.Dongle==null).ToArray();
         foreach(var entry in retry) await DiscoverAsync(entry,true);
+        DeviceEntry[] propertyEntries;
+        lock(gate)
+        {
+            foreach(var entry in entries.Values) UpdatePropertyCapability(entry);
+            propertyEntries=entries.Values.ToArray();
+        }
         Publish();
+        foreach(var entry in propertyEntries)
+            if(entry.CanRefreshProperties) _=RefreshPropertiesAsync(entry,CancellationToken.None);
     }
     async Task AddAsync(IDevice source)
     {
@@ -66,7 +85,18 @@ public sealed class JabraBackend : IDeviceBackend
         lock(gate) { if(disposed) return; entries[key]=entry; }
         Publish();
         await DiscoverAsync(entry,false);
+        bool refreshProperties;
+        lock(gate)
+        {
+            if(disposed || !entries.Values.Contains(entry)) return;
+            UpdatePropertyCapability(entry);
+            refreshProperties=entry.CanRefreshProperties;
+        }
+        Publish();
+        if(refreshProperties) await RefreshPropertiesAsync(entry,CancellationToken.None);
     }
+    void UpdatePropertyCapability(DeviceEntry entry) =>
+        entry.CanRefreshProperties=propertiesInitialized && DevicePropertyCapabilities.Find(entry.BaseInfo)!=null;
     void SlowOperation()=>Faulted?.Invoke("Jabra antwortet verzögert. Der laufende Vorgang bleibt gesperrt, bis die Gerätekommunikation beendet ist.");
     async Task DiscoverAsync(DeviceEntry entry,bool retry)
     {
@@ -103,6 +133,29 @@ public sealed class JabraBackend : IDeviceBackend
     {
         lock(gate) return entries.Values.FirstOrDefault(e=>e.Id==id && e.Dongle!=null)
             ?? throw new InvalidOperationException("Dongle nicht verfügbar oder Bluetooth-Verwaltung nicht unterstützt.");
+    }
+    public async Task RefreshDevicePropertiesAsync(string deviceId,CancellationToken token)
+    {
+        DeviceEntry? entry;
+        lock(gate) entry=entries.Values.FirstOrDefault(e=>e.Id==deviceId && e.CanRefreshProperties);
+        if(entry==null) return;
+        await RefreshPropertiesAsync(entry,token);
+    }
+    async Task RefreshPropertiesAsync(DeviceEntry entry,CancellationToken token)
+    {
+        var capability=DevicePropertyCapabilities.Find(entry.BaseInfo);
+        if(capability==null) return;
+        var value=await entry.PropertyReadRunner.ReadAsync(
+            ()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),token);
+        lock(gate)
+        {
+            if(disposed || !entries.Values.Contains(entry)) return;
+            var updated=DevicePropertyValueUpdate.TryApply(entry.Info,capability,value,isAttached:true);
+            if(updated is null) return;
+            entry.BatteryPercent=updated.BatteryPercent;
+            entry.Firmware=updated.Firmware;
+        }
+        Publish();
     }
     static string Remember(DeviceEntry entry,IBluetoothAddress address)
     {
