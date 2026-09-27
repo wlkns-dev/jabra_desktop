@@ -47,27 +47,27 @@
 - `IDeviceBackend` adds `Task RefreshDevicePropertiesAsync(string deviceId, CancellationToken token)`.
 - `DeviceSession` adds `Task RefreshDevicePropertiesAsync(string deviceId, CancellationToken token = default)`, delegating only while that physical device remains in its snapshot and without requiring `CanPair` or using the pairing-operation busy lock.
 
-- [ ] **Step 1: Add failing session contract tests**
+- [x] **Step 1: Add failing session contract tests**
 
 Add `RefreshPropertiesCanTargetAHeadsetWithoutPairing` and assert a `DeviceInfo` with `CanPair == false` and `CanRefreshProperties == true` is passed to `FakeBackend`. Add `RefreshPropertiesForRemovedDeviceDoesNothing` and assert no backend call occurs after the snapshot no longer contains the ID. Add `PropertyRefreshDoesNotSerializeBluetoothActions` with an incomplete fake property task; assert `RefreshAsync` for a selected dongle can still finish.
 
-- [ ] **Step 2: Run the focused tests and confirm they fail for the missing contract**
+- [x] **Step 2: Run the focused tests and confirm they fail for the missing contract**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~SessionTests -m:1`
 
 Expected: FAIL because `CanRefreshProperties` and `RefreshDevicePropertiesAsync` are not yet implemented.
 
-- [ ] **Step 3: Implement the Core status-refresh contract**
+- [x] **Step 3: Implement the Core status-refresh contract**
 
 Append `CanRefreshProperties = false` to `DeviceInfo`; add the backend method; make `DeviceSession.RefreshDevicePropertiesAsync` validate that the ID is still present, then delegate directly. It must not require a dongle and must not change the existing `IsBusy` state used by Bluetooth operations. Extend `FakeBackend` with `PropertyRefreshCalls` and an optional `PropertyRefreshCompletion` task.
 
-- [ ] **Step 4: Run session tests**
+- [x] **Step 4: Run session tests**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~SessionTests -m:1`
 
 Expected: PASS, including headset refresh, removed-device no-op, and independent Bluetooth operations.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add src/JabraDesktop.Core/Models.cs src/JabraDesktop.Core/IDeviceBackend.cs src/JabraDesktop.Core/DeviceSession.cs tests/JabraDesktop.Tests/FakeBackend.cs tests/JabraDesktop.Tests/SessionTests.cs
@@ -95,33 +95,33 @@ git commit -m "feat: add device status refresh contract"
 - `DevicePropertyReadRunner.ReadAsync(Func<Task<PropertyValue>> read, CancellationToken token) -> Task<PropertyValue?>` bounds an SDK read to 10 seconds, returns null on failure/timeout/already-in-flight, and keeps tracking an unfinished native read so reads for that device never overlap.
 - `JabraBackend.RefreshDevicePropertiesAsync` reads an existing SDK entry without requiring a `BluetoothDongle`, applies parsed values to that entry, and publishes only if the same entry remains attached.
 
-- [ ] **Step 1: Add failing capability and parser tests**
+- [x] **Step 1: Add failing capability and parser tests**
 
 In `DevicePropertyTests`, add `FindsFirmwareForLink380`, `FindsBatteryForEvolve75Se`, `RejectsLink370AndUnknownIdentity`, and `RejectsKnownIdsWithWrongRole`. Test firmware with `PropertyValue.FromString("2.1.0")`, whitespace-only firmware, and `PropertyValue.FromInt32(75)`; test battery with integer values 0 and 100, -1 and 101, plus string and number values.
 
-- [ ] **Step 2: Run focused tests and verify the missing adapter API fails**
+- [x] **Step 2: Run focused tests and verify the missing adapter API fails**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~DevicePropertyTests -m:1`
 
 Expected: FAIL because the capability table and value mapper do not exist.
 
-- [ ] **Step 3: Add exact capability mapping and typed value parsing**
+- [x] **Step 3: Add exact capability mapping and typed value parsing**
 
 Create `DevicePropertyCapabilities.cs` with the two VID/PID/role entries from the spec and no display-name matching. Implement `PropertyValueMapper` using the SDK's `StringPropertyValue`/`IntegerPropertyValue` types and `AsString()`/`AsInteger()` accessors. Set `DeviceInfo.CanRefreshProperties` true only when the capability table has an entry and the optional Properties factory initialized successfully.
 
-- [ ] **Step 4: Add the optional Properties package and a testable SDK reader**
+- [x] **Step 4: Add the optional Properties package and a testable SDK reader**
 
 Add `Jabra.NET.Sdk.Properties` version `2.5.1.1` as a package reference to both the adapter and test project. In `DevicePropertiesReader.cs`, define the internal `IDevicePropertiesReader` seam and implement `JabraPropertiesReader` with the public SDK APIs. The reader initializes once after Core SDK startup and reads only the name it is given. Add `InternalsVisibleTo("JabraDesktop.Tests")` so tests can inject a fake reader and test the refresh runner without initializing the physical SDK.
 
-- [ ] **Step 5: Implement initial and manual property reads safely**
+- [x] **Step 5: Implement initial and manual property reads safely**
 
 For each discovered supported entry, begin one asynchronous initial read after SDK startup; also run one initial pass over the final device snapshot to cover devices emitted during startup. `JabraBackend.RefreshDevicePropertiesAsync` must serialize reads per entry, wrap SDK `Get()` in a 10-second timeout, map errors/timeouts to null values, and keep any unfinished native read tracked so another read cannot overlap it. Ignore late results after timeout or removal. SDK module initialization failure leaves `CanRefreshProperties` false and values null without raising the pairing/session `Faulted` event. Do not log values.
 
-- [ ] **Step 6: Add adapter lifecycle tests**
+- [x] **Step 6: Add adapter lifecycle tests**
 
 Use the fake reader to test successful values, optional-module initialization failure, read exception, timeout, duplicate refresh while an SDK operation is still in flight, and removal before completion. Assert discovery and the existing pairing capability remain unchanged, failures do not publish a global error, and late values are ignored.
 
-- [ ] **Step 7: Run adapter tests and full existing tests**
+- [x] **Step 7: Run adapter tests and full existing tests**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~DevicePropertyTests -m:1`
 
@@ -131,7 +131,7 @@ Run: `./scripts/dotnet.sh test -m:1`
 
 Expected: PASS with all prior pairing, UI, and lifecycle tests unchanged.
 
-- [ ] **Step 8: Review package terms and commit Task 2**
+- [x] **Step 8: Review package terms and commit Task 2**
 
 Verify the `Jabra.NET.Sdk.Properties` license files and publish/runtime assets from the restored package; update `THIRD-PARTY-NOTICES.md` with its exact license and relevant transitive/runtime components. Confirm there are no native files for unsupported platforms copied into the Linux package.
 
@@ -155,21 +155,21 @@ git commit -m "feat: read supported Jabra device properties"
 - `MainViewModel` exposes `bool IsRefreshingProperties`, `bool CanRefreshProperties`, and `IAsyncRelayCommand RefreshPropertiesCommand`.
 - The command captures the selected device's opaque session ID, calls `DeviceSession.RefreshDevicePropertiesAsync`, and ends its visual busy state when the bounded adapter call returns. It is visible only when `DeviceInfo.CanRefreshProperties` is true and remains independent of scan/pair busy state.
 
-- [ ] **Step 1: Add failing ViewModel and localization tests**
+- [x] **Step 1: Add failing ViewModel and localization tests**
 
 Add `RefreshPropertiesCommandTargetsSelectedDevice` and assert the selected headset ID reaches `FakeBackend`, `IsRefreshingProperties` is true while the fake task is pending, and returns false after completion. Add `UnsupportedDeviceCannotRefreshProperties` asserting a Link 370 row does not expose an enabled refresh command. Add `PropertyRefreshDoesNotBlockScanOrPairCommands` with an incomplete property refresh. Add German/English exact-label assertions and a dynamic language-change assertion for the refresh command.
 
-- [ ] **Step 2: Run focused tests and confirm refresh presentation is absent**
+- [x] **Step 2: Run focused tests and confirm refresh presentation is absent**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~ViewModelTests -m:1`
 
 Expected: FAIL because the status refresh command and localization values are not present.
 
-- [ ] **Step 3: Implement localized command state and bind the view**
+- [x] **Step 3: Implement localized command state and bind the view**
 
 Add the localized command labels. Bind a refresh button next to the Battery/Firmware card; show it only when the selected row supports status refresh, disable it while refreshing, and change its localized text for the pending state. Keep property refresh busy state separate from `DeviceSession.IsBusy` and scan state. Notify `CanRefreshProperties`, `IsRefreshingProperties`, and command availability when selection or language changes.
 
-- [ ] **Step 4: Run focused UI tests**
+- [x] **Step 4: Run focused UI tests**
 
 Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedName~ViewModelTests -m:1`
 

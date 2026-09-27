@@ -10,8 +10,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     readonly DeviceSession session;
     readonly Action<Action> dispatch;
     readonly LocalizationService texts;
+    IAsyncRelayCommand? refreshPropertiesCommand;
     DeviceListItemViewModel? selectedDevice;
-    bool syncing,disposed,isScanning,hasSearched;
+    bool syncing,disposed,isScanning,hasSearched,isRefreshingProperties;
     public ObservableCollection<DeviceListItemViewModel> Devices { get; }=[];
     public ObservableCollection<PeerRow> Peers { get; }=[];
     public ObservableCollection<PeerRow> Results { get; }=[];
@@ -29,6 +30,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
     public bool CanScan => selectedDevice?.Device.CanPair==true && !session.IsBusy;
+    public bool CanRefreshProperties => selectedDevice?.Device.CanRefreshProperties==true;
+    public bool IsRefreshingProperties { get=>isRefreshingProperties; private set { if(SetProperty(ref isRefreshingProperties,value)) OnPropertyChanged(nameof(RefreshPropertiesText)); } }
+    public string RefreshPropertiesText => texts[IsRefreshingProperties ? UiText.RefreshingDeviceStatus : UiText.RefreshDeviceStatus];
     public bool IsBusy => session.IsBusy;
     public bool IsScanning { get=>isScanning; private set { SetProperty(ref isScanning,value); OnPropertyChanged(nameof(ShowSearch)); } }
     public bool ShowSearch => hasSearched || IsScanning || Results.Count>0;
@@ -51,6 +55,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand ScanCommand { get; }
     public IRelayCommand CancelScanCommand { get; }
     public IAsyncRelayCommand RefreshCommand { get; }
+    public IAsyncRelayCommand RefreshPropertiesCommand => refreshPropertiesCommand!;
     public IAsyncRelayCommand RetryCommand { get; }
     public MainViewModel(DeviceSession session, Action<Action> dispatch, LocalizationService? texts = null)
     {
@@ -66,6 +71,19 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         },()=>CanScan);
         CancelScanCommand=new RelayCommand(session.CancelScan);
         RefreshCommand=new AsyncRelayCommand(()=>session.RefreshAsync(),()=>CanScan);
+        refreshPropertiesCommand=new AsyncRelayCommand(async () =>
+        {
+            var deviceId=selectedDevice?.Device.Id;
+            if(deviceId is null) return;
+            IsRefreshingProperties=true;
+            refreshPropertiesCommand?.NotifyCanExecuteChanged();
+            try { await session.RefreshDevicePropertiesAsync(deviceId); }
+            finally
+            {
+                IsRefreshingProperties=false;
+                refreshPropertiesCommand?.NotifyCanExecuteChanged();
+            }
+        },()=>CanRefreshProperties && !IsRefreshingProperties);
         RetryCommand=new AsyncRelayCommand(StartAsync);
         session.Changed+=OnChanged;
         Sync();
@@ -137,8 +155,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     void NotifyState()
     {
-        foreach(var name in new[]{nameof(CanScan),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary)}) OnPropertyChanged(name);
-        ScanCommand.NotifyCanExecuteChanged(); RefreshCommand.NotifyCanExecuteChanged();
+        foreach(var name in new[]{nameof(CanScan),nameof(CanRefreshProperties),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(RefreshPropertiesText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary)}) OnPropertyChanged(name);
+        ScanCommand.NotifyCanExecuteChanged(); RefreshCommand.NotifyCanExecuteChanged(); RefreshPropertiesCommand.NotifyCanExecuteChanged();
     }
     internal async Task ActAsync(PeerInfo peer,DeviceAction action)
     {

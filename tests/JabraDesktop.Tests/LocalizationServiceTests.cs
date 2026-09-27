@@ -7,6 +7,16 @@ namespace JabraDesktop.Tests;
 
 public sealed class LocalizationServiceTests
 {
+    [Theory]
+    [InlineData(UiLanguage.German, UiText.RefreshDeviceStatus, "Gerätestatus aktualisieren")]
+    [InlineData(UiLanguage.German, UiText.RefreshingDeviceStatus, "Status wird aktualisiert …")]
+    [InlineData(UiLanguage.English, UiText.RefreshDeviceStatus, "Refresh device status")]
+    [InlineData(UiLanguage.English, UiText.RefreshingDeviceStatus, "Refreshing status …")]
+    public void PropertyRefreshLabelsAreLocalized(UiLanguage language, UiText key, string expected)
+    {
+        Assert.Equal(expected, UiTextCatalog.Get(language, key));
+    }
+
     [Fact]
     public void UnsupportedSystemCultureDefaultsToEnglish()
     {

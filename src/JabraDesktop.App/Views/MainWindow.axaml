@@ -75,9 +75,10 @@
      <ItemsControl ItemsSource="{Binding Results}" />
     </StackPanel>
     <Border Classes="card" IsVisible="{Binding HasDevice}">
-     <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
+     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="20" RowSpacing="12">
       <StackPanel Spacing="8"><TextBlock Text="{Binding Texts[Battery]}" Classes="eyebrow" /><TextBlock Text="{Binding BatteryText}" Classes="muted" /></StackPanel>
       <StackPanel Grid.Column="1" Spacing="8"><TextBlock Text="{Binding Texts[Firmware]}" Classes="eyebrow" /><TextBlock Text="{Binding FirmwareText}" Classes="muted" /></StackPanel>
+      <Button Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" Content="{Binding RefreshPropertiesText}" IsVisible="{Binding CanRefreshProperties}" Command="{Binding RefreshPropertiesCommand}" />
      </Grid>
     </Border>
     <TextBlock Text="{Binding Texts[FeatureDependsOnDevice]}" Classes="muted" FontSize="11" TextWrapping="Wrap" />

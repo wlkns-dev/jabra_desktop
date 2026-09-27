@@ -31,6 +31,8 @@ public enum UiText
     Reinitialize,
     SavedDevices,
     Refresh,
+    RefreshDeviceStatus,
+    RefreshingDeviceStatus,
     NoPairs,
     NearbyDevices,
     StopSearch,

@@ -50,6 +50,57 @@ public class ViewModelTests
         var b=new FakeBackend{NextError=new UnauthorizedAccessException()}; var vm=new MainViewModel(new(b),a=>a());
         await vm.StartAsync(); Assert.Contains("USB",vm.Error);
     }
+    [Fact] public async Task RefreshPropertiesTargetsSelectedDeviceAndTracksPendingState()
+    {
+        var backend=new FakeBackend { PropertyRefreshCompletion=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var vm=new MainViewModel(new DeviceSession(backend),a=>a());
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75 SE",false,Role:DeviceRole.Headset,VendorId:2830,ProductId:9474,CanRefreshProperties:true));
+
+        var refresh=vm.RefreshPropertiesCommand.ExecuteAsync(null);
+
+        Assert.True(vm.CanRefreshProperties);
+        Assert.True(vm.IsRefreshingProperties);
+        Assert.Equal(["headset"],backend.PropertyRefreshCalls);
+        backend.PropertyRefreshCompletion.SetResult();
+        await refresh;
+        Assert.False(vm.IsRefreshingProperties);
+    }
+    [Fact] public void UnsupportedDeviceCannotRefreshProperties()
+    {
+        var backend=new FakeBackend(); var vm=new MainViewModel(new DeviceSession(backend),a=>a());
+        backend.EmitDevices(new DeviceInfo("link370","Link 370",false,Role:DeviceRole.Dongle,VendorId:2830,ProductId:9415));
+
+        Assert.False(vm.CanRefreshProperties);
+        Assert.False(vm.RefreshPropertiesCommand.CanExecute(null));
+    }
+    [Fact] public async Task PropertyRefreshDoesNotBlockScanOrPairCommands()
+    {
+        var backend=new FakeBackend { PropertyRefreshCompletion=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously), Peers=[new("peer","Headset",LinkState.Disconnected)] };
+        var vm=new MainViewModel(new DeviceSession(backend),a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link 380",true,Role:DeviceRole.Dongle,CanRefreshProperties:true));
+        var peer=Assert.Single(vm.Peers);
+
+        var refresh=vm.RefreshPropertiesCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsBusy);
+        Assert.True(vm.CanScan);
+        Assert.True(peer.ActionCommand.CanExecute(null));
+        backend.PropertyRefreshCompletion.SetResult();
+        await refresh;
+    }
+    [Fact] public void PropertyRefreshLabelsUpdateWithLanguage()
+    {
+        var texts=new JabraDesktop.App.LocalizationService(JabraDesktop.App.UiLanguage.German);
+        var backend=new FakeBackend(); var vm=new MainViewModel(new DeviceSession(backend),a=>a(),texts);
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75 SE",false,CanRefreshProperties:true));
+        var changes=new List<string?>(); vm.PropertyChanged+=(_,e)=>changes.Add(e.PropertyName);
+
+        Assert.Equal("Gerätestatus aktualisieren",vm.RefreshPropertiesText);
+        texts.SetLanguage(JabraDesktop.App.UiLanguage.English);
+
+        Assert.Equal("Refresh device status",vm.RefreshPropertiesText);
+        Assert.Contains(nameof(MainViewModel.RefreshPropertiesText),changes);
+    }
 }
 public class DisplayTests
 {
