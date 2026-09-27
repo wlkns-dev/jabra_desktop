@@ -11,12 +11,19 @@ public sealed class FakeBackend : IDeviceBackend
     public Exception? NextError { get; set; }
     public TaskCompletionSource? OperationCompletion { get; set; }
     public TaskCompletionSource? ReadCompletion { get; set; }
+    public TaskCompletionSource? PropertyRefreshCompletion { get; set; }
+    public List<string> PropertyRefreshCalls { get; }=[];
     public List<(string Dongle, string Peer, DeviceAction Action)> Calls { get; } = [];
     public void EmitDevices(params DeviceInfo[] devices) => DevicesChanged?.Invoke(devices);
     public void Fail(string text) => Faulted?.Invoke(text);
     public Task StartAsync(CancellationToken token) => NextError is {} e ? Task.FromException(e) : Task.CompletedTask;
     public async Task<IReadOnlyList<PeerInfo>> GetPeersAsync(string id, CancellationToken token)
     { if (ReadCompletion is {} pending) await pending.Task; return Peers; }
+    public async Task RefreshDevicePropertiesAsync(string id,CancellationToken token)
+    {
+        PropertyRefreshCalls.Add(id);
+        if(PropertyRefreshCompletion is {} pending) await pending.Task.WaitAsync(token);
+    }
     public async IAsyncEnumerable<PeerInfo> ScanAsync(string id, [EnumeratorCancellation] CancellationToken token)
     { await foreach(var p in Scan.Reader.ReadAllAsync(token)) yield return p; }
     public async Task ExecuteAsync(string id,string peer,DeviceAction action,CancellationToken token)

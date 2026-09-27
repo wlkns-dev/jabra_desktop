@@ -75,6 +75,14 @@ public sealed class DeviceSession : IAsyncDisposable
             if(changed) Changed?.Invoke();
         }, showActivity:false);
     }
+    public Task RefreshDevicePropertiesAsync(string deviceId,CancellationToken token = default)
+    {
+        lock(gate)
+        {
+            if(disposed || !devices.Any(d=>d.Id==deviceId)) return Task.CompletedTask;
+        }
+        return backend.RefreshDevicePropertiesAsync(deviceId,token);
+    }
     bool Current(string id,long epoch) => !disposed && selected==id && generation==epoch;
     async Task WithOperation(Func<string,long,Task> operation, bool clearError = false, bool showActivity = true)
     {

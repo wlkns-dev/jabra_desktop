@@ -78,4 +78,35 @@ public class SessionTests
         using var c=new CancellationTokenSource(); var t=s.RunAsync("p",DeviceAction.Connect,c.Token);
         c.Cancel(); Assert.True(s.IsBusy); b.OperationCompletion.SetResult(); await t; Assert.False(s.IsBusy);
     }
+    [Fact] public async Task RefreshPropertiesCanTargetAHeadsetWithoutPairing()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75 SE",false,CanRefreshProperties:true));
+
+        await session.RefreshDevicePropertiesAsync("headset");
+
+        Assert.Equal(["headset"],backend.PropertyRefreshCalls);
+    }
+    [Fact] public async Task RefreshPropertiesForRemovedDeviceDoesNothing()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75 SE",false,CanRefreshProperties:true));
+        backend.EmitDevices();
+
+        await session.RefreshDevicePropertiesAsync("headset");
+
+        Assert.Empty(backend.PropertyRefreshCalls);
+    }
+    [Fact] public async Task PropertyRefreshDoesNotSerializeBluetoothActions()
+    {
+        var (backend,session)=Setup();
+        backend.PropertyRefreshCompletion=new();
+
+        var propertyRefresh=session.RefreshDevicePropertiesAsync("a");
+        await session.RefreshAsync().WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.False(propertyRefresh.IsCompleted);
+        backend.PropertyRefreshCompletion.SetResult();
+        await propertyRefresh;
+    }
 }
