@@ -232,17 +232,17 @@ git add docs/hardware-validation.md docs/releases/v0.4.0.md README.md Directory.
 git commit -m "release: prepare Jabra Desktop 0.4.0"
 ```
 
-- [ ] **Step 6: Publish after final review**
+- [x] **Step 6: Publish after final review**
 
 Create annotated tag `v0.4.0` and GitHub Release with the verified Arch package and SHA-256. Confirm package, app, tag, release, and notes all say `0.4.0`. Do not claim unverified device/firmware combinations.
 
 ## Final Review Checklist
 
-- [ ] Unsupported devices never request SDK properties.
-- [ ] Battery and firmware parsing accepts only the expected SDK types and documented value ranges.
-- [ ] Optional SDK failures and timeouts do not affect pairing or block the UI.
-- [ ] Removed devices and timed-out reads cannot publish stale values.
-- [ ] No property write or telemetry/polling path was added.
-- [ ] Package notices and Linux contents include the Properties SDK correctly.
-- [ ] Hardware claims match `docs/hardware-validation.md`.
-- [ ] Arch package, app version, changelog, tag, and GitHub Release agree on `0.4.0`.
+- [x] Unsupported devices never request SDK properties.
+- [x] Battery and firmware parsing accepts only the expected SDK types and documented value ranges.
+- [x] Optional SDK failures and timeouts do not affect pairing or block the UI.
+- [x] Removed devices and timed-out reads cannot publish stale values.
+- [x] No property write or telemetry/polling path was added.
+- [x] Package notices and Linux contents include the Properties SDK correctly.
+- [x] Hardware claims match `docs/hardware-validation.md`.
+- [x] Arch package, app version, changelog, tag, and GitHub Release agree on `0.4.0`.
