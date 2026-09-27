@@ -175,7 +175,7 @@ Run: `./scripts/dotnet.sh test tests/JabraDesktop.Tests --filter FullyQualifiedN
 
 Expected: PASS for selected identity, unsupported device, independent actions, busy completion, and dynamic DE/EN updates.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 git add src/JabraDesktop.App/ViewModels/MainViewModel.cs src/JabraDesktop.App/Localization/UiText.cs src/JabraDesktop.App/Localization/UiTextCatalog.cs src/JabraDesktop.App/Views/MainWindow.axaml tests/JabraDesktop.Tests/ViewModelTests.cs tests/JabraDesktop.Tests/LocalizationServiceTests.cs
@@ -197,19 +197,19 @@ git commit -m "feat: add localized status refresh controls"
 - Release version is `0.4.0`; Arch package version is `pkgver=0.4.0`, initially `pkgrel=1`.
 - Hardware matrix lists Link 380 firmware and Evolve 75 SE battery reads as separate cases; any unavailable live test remains explicitly `Not tested`.
 
-- [ ] **Step 1: Run the hardware property probe with available devices**
+- [x] **Step 1: Run the hardware property probe with available devices**
 
 Use the app adapter/probe on Link 380 and Evolve 75 SE independently. Record only model, VID/PID, role, OS/kernel, Core/Properties/Device Connector versions, and returned values. Do not perform writes or scan/pair/unpair operations. If SDK communication is unavailable, record the reason as unverified and continue with automated validation.
 
-- [ ] **Step 2: Update hardware and user documentation**
+- [x] **Step 2: Update hardware and user documentation**
 
 Add observed property outcomes to `docs/hardware-validation.md`, separating documented support from successful reads. Create `docs/releases/v0.4.0.md` with the read-only behavior, exact device coverage, install/upgrade command, hardware limitations, and test totals. Update README capability and current package instructions. Do not claim Link 370 or general Evolve support.
 
-- [ ] **Step 3: Synchronize versions and verify package contents**
+- [x] **Step 3: Synchronize versions and verify package contents**
 
 Set `Directory.Build.props` and `packaging/PKGBUILD` to `0.4.0` / `pkgrel=1`. Build the self-contained Arch package and inspect its included Properties assemblies, license files, and runtime/native assets; confirm only Linux-supported runtime assets are shipped.
 
-- [ ] **Step 4: Run the release verification suite**
+- [x] **Step 4: Run the release verification suite**
 
 Run: `./scripts/dotnet.sh test -m:1`
 

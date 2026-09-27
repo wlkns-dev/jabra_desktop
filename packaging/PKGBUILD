@@ -1,5 +1,5 @@
 pkgname=jabra-desktop
-pkgver=0.3.0
+pkgver=0.4.0
 pkgrel=1
 pkgdesc='Linux desktop application for managing Jabra Link dongles and headsets'
 arch=('x86_64')

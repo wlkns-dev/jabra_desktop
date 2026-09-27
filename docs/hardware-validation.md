@@ -50,3 +50,24 @@ System: CachyOS x86_64, Kernel `7.2.7-1-cachyos`, KDE. Jabra SDK `4.9.1.1`, Devi
 Der aktuelle Link-380-Probe-Lauf meldete zusätzlich die Kopplungen `Jabra Evolve 75`, `Jabra Evolve HO`, `Evolve 1` und `SW - Jabra Speak 710`; nur `Evolve 1` war dabei als verbunden gemeldet. Die automatische Suche wurde nicht gestartet, weil kein Testgerät absichtlich im Pairing-Modus war. Seriennummern und Bluetooth-Adressen wurden nicht protokolliert.
 
 Die App listet Geräte anhand ihrer SDK-Rolle und VID:PID. Das bestätigt die Geräteerkennung für die oben geprüfte Kombination, aber keine pauschale Kompatibilität aller Link- oder Evolve-Varianten.
+
+## Geräteeigenschaften-Release 0.4.0 – Prüfung am 27.09.2026
+
+Das Properties-Modul `Jabra.NET.Sdk.Properties 2.5.1.1` wurde integriert. Die
+SDK-Dokumentation nennt `firmwareVersion` für Link 380 und `batteryLevel` für
+Evolve-Familien. Der lokale Hardwarelauf (`Probe -- list`) fand während der
+Releaseprüfung keine angeschlossenen Geräte (Exitcode 2), daher wurden keine
+Eigenschaftswerte live gelesen.
+
+| Eigenschaft | Freigabe | Ergebnis auf lokaler Hardware |
+|---|---|---|
+| Link 380 `0B0E:24C7`, Rolle Dongle, `firmwareVersion` | Dokumentiert und exakt freigeschaltet | Nicht getestet; Link 380 war beim Lauf nicht angeschlossen |
+| Evolve 75 SE `0B0E:2502`, Rolle Headset, `batteryLevel` | Familienunterstützung dokumentiert; konkrete Kombination unbestätigt | Nicht getestet; Headset war beim Lauf nicht angeschlossen |
+| Link 370 und alle anderen Geräte | Keine Freigabe in 0.4.0 | Nicht getestet |
+
+Eigenschaften werden nur bei Start und explizitem Tastendruck gelesen. Es gibt
+keine periodischen Eigenschaftenabfragen oder Schreibzugriffe. Ungültige Werte,
+Fehler und Zeitüberschreitungen bleiben nicht verfügbar. Der Adapter verwendet
+Jabra Properties 2.5.1.1 zusammen mit Core 4.9.1.1 und Linux Device Connector
+2.1.5. Ein erneuter Live-Test mit eingestecktem Link 380 und separat mit dem
+Evolve 75 SE ist für die Hardwarebestätigung offen.

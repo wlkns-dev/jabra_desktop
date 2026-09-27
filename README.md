@@ -71,15 +71,15 @@ sudo pacman -U "$package_file"
 ```
 
 Fertige Arch-Pakete werden als Assets in den [GitHub Releases](https://github.com/wlkns-dev/jabra_desktop/releases)
-bereitgestellt. Für Release `v0.3.0` lädst du das Paket herunter und installierst
+bereitgestellt. Für Release `v0.4.0` lädst du das Paket herunter und installierst
 es zum Beispiel so:
 
 ```bash
-curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.3.0/jabra-desktop-0.3.0-1-x86_64.pkg.tar.zst
-sudo pacman -U ./jabra-desktop-0.3.0-1-x86_64.pkg.tar.zst
+curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.4.0/jabra-desktop-0.4.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./jabra-desktop-0.4.0-1-x86_64.pkg.tar.zst
 ```
 
-Softwarestände verwenden annotierte Git-Tags wie `v0.3.0`. Die Version in
+Softwarestände verwenden annotierte Git-Tags wie `v0.4.0`. Die Version in
 `Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
 für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater
 gibt es nicht. AUR und ein automatisiertes Pacman-Repository sind noch nicht
@@ -110,6 +110,12 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
 
 Der Status wird nach Aktionen und im Ruhezustand alle vier Sekunden aktualisiert.
 Ein unbekannter Status wird niemals als bestätigte Verbindung ausgegeben.
+
+Akku- und Firmwarewerte werden bei unterstützten Geräten einmal beim Start und
+auf Knopfdruck gelesen. In Version 0.4.0 ist Firmware auf Link 380 und der
+Akkustand auf Evolve 75 SE beschränkt. Andere Modelle zeigen „Nicht verfügbar“;
+die Eigenschaftsunterstützung des Evolve 75 SE ist dokumentiert, aber auf dieser
+Hardware noch nicht bestätigt. Link 370 wird nicht freigeschaltet.
 
 ## USB-Berechtigungen
 
@@ -175,8 +181,8 @@ Zum Koppeln neuer Geräte bevorzugt die grafische Oberfläche verwenden. Alterna
   beider Dongles sind noch nicht getestet; Details stehen in
   `docs/hardware-validation.md`.
 - USB-Headsets erscheinen in der Übersicht, besitzen aber keine Dongle-Suche.
-- Akku/Firmware stehen in dieser Version als „Nicht verfügbar“, solange kein
-  Telemetrieadapter integriert ist. Es werden keine Werte erfunden.
+- Akku/Firmware werden nur für die in 0.4.0 freigegebenen Gerätemodelle gelesen;
+  weitere Modelle und Link 370 bleiben „Nicht verfügbar“.
 - Fremdhersteller werden bei Suchtreffern nicht ausgefiltert; Kompatibilität
   ist experimentell. DECT, BlueZ, Firmware-Updates und Audioeinstellungen folgen
   gegebenenfalls separat.
