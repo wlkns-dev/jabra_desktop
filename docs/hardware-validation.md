@@ -71,3 +71,28 @@ Fehler und Zeitüberschreitungen bleiben nicht verfügbar. Der Adapter verwendet
 Jabra Properties 2.5.1.1 zusammen mit Core 4.9.1.1 und Linux Device Connector
 2.1.5. Ein erneuter Live-Test mit eingestecktem Link 380 und separat mit dem
 Evolve 75 SE ist für die Hardwarebestätigung offen.
+
+## Multi-Dongle 0.5.0 – Prüfung am 28.09.2026
+
+Link 370 und Link 380 waren gleichzeitig angeschlossen. Die read-only
+`Probe inventory` lieferte dreimal hintereinander beide Kopplungslisten mit
+je vier Einträgen. Die aktiven Endgeräte wurden über SDK-Elternverbindung und
+Bluetooth-Child-Metadaten zugeordnet, nicht anhand ihres Anzeigenamens.
+
+| Gerät | Firmware | Akku | Zuordnung |
+|---|---|---|---|
+| Link 370 | 1.87.0 | nicht anwendbar | Dongle |
+| Speak 710 | 1.40.0 | 53 % | Link 370, verbunden |
+| Link 380 | 1.16.0 | nicht anwendbar | Dongle |
+| Evolve 75 SE (Kopplungsname Evolve 1) | 1.1.0 | 94 % | Link 380, verbunden |
+
+Speak 710 und Evolve wurden nacheinander über ihren jeweiligen Dongle getrennt
+und wieder verbunden. Die anschließend ausgelesene Kopplungsliste bestätigte
+jeweils `Disconnected` und danach `Connected`; beide Verbindungen wurden
+wiederhergestellt. Die gespeicherten Kopplungen blieben erhalten.
+
+Physisches USB-Abziehen und echtes Entkoppeln wurden in diesem Lauf nicht
+vorgenommen. Entfernen während einer Abfrage, getrennte Fehlerzustände,
+Aktionsziele und Bestätigung beim Entkoppeln werden automatisiert geprüft.
+Ein gebautes Ubuntu-Paket ist keine Bestätigung eines Ubuntu-Laufzeittests;
+der lokale Hardwaretest erfolgt auf CachyOS/KDE.

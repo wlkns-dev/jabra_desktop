@@ -12,7 +12,9 @@ public sealed class DeviceSession : IAsyncDisposable
     readonly HashSet<string> foregroundBusy = [];
     readonly Dictionary<string,SemaphoreSlim> operationLocks = [];
     readonly Dictionary<string,DonglePeerSnapshot> peerSnapshots = [];
-    readonly Dictionary<string,Task> refreshes = [];
+    readonly Dictionary<(string Id,long Attachment),Task> refreshes = [];
+    readonly Dictionary<string,long> attachments=[];
+    long nextAttachment;
     IReadOnlyList<DeviceInfo> devices = [];
     IReadOnlyList<PeerInfo> peers = [], results = [];
     string? selected, error;
@@ -33,6 +35,8 @@ public sealed class DeviceSession : IAsyncDisposable
     public IReadOnlyList<DonglePeerSnapshot> PeerSnapshots { get { lock(gate) return peerSnapshots.Values.ToArray(); } }
     public string? SelectedId { get { lock(gate) return selected; } }
     public bool IsBusy { get { lock(gate) return starting || selected is {} id && foregroundBusy.Contains(id); } }
+    public bool IsDongleBusy(string id) { lock(gate) return foregroundBusy.Contains(id); }
+    bool Attached(string id,long attachment)=>!disposed && attachments.GetValueOrDefault(id)==attachment;
     public string? Error { get { lock(gate) return error; } }
     void OnFault(string message) { lock(gate) { if(disposed) return; error = message; } Changed?.Invoke(); }
     void OnDevices(IReadOnlyList<DeviceInfo> update)
@@ -45,7 +49,12 @@ public sealed class DeviceSession : IAsyncDisposable
             devices=next;
             var dongleIds=devices.Where(d=>d.CanPair).Select(d=>d.Id).ToHashSet();
             foreach(var id in peerSnapshots.Keys.Where(id=>!dongleIds.Contains(id)).ToArray()) peerSnapshots.Remove(id);
-            foreach(var id in dongleIds) peerSnapshots.TryAdd(id,new(id,[]));
+            foreach(var id in attachments.Keys.Where(id=>!dongleIds.Contains(id)).ToArray()) attachments.Remove(id);
+            foreach(var id in dongleIds)
+            {
+                peerSnapshots.TryAdd(id,new(id,[]));
+                if(!attachments.ContainsKey(id)) attachments[id]=++nextAttachment;
+            }
             if(selected != null && !devices.Any(d => d.Id == selected)) SelectLocked(null);
         }
         Changed?.Invoke();
@@ -81,6 +90,7 @@ public sealed class DeviceSession : IAsyncDisposable
             lock(gate)
             {
                 if(Current(id,epoch) && !peers.SequenceEqual(update)) { peers=update.ToArray(); changed=true; }
+                if(Current(id,epoch)) peerSnapshots[id]=new(id,update.ToArray());
             }
             if(changed) Changed?.Invoke();
         }, operationName:"refresh", showActivity:false);
@@ -95,24 +105,38 @@ public sealed class DeviceSession : IAsyncDisposable
     Task RefreshDongleAsync(string id,CancellationToken token)
     {
         TaskCompletionSource completion;
+        long attachment;
         lock(gate)
         {
             if(disposed || !devices.Any(d=>d.Id==id && d.CanPair)) return Task.CompletedTask;
-            if(refreshes.TryGetValue(id,out var existing)) return existing;
+            attachment=attachments[id];
+            if(refreshes.TryGetValue((id,attachment),out var existing)) return existing;
             completion=new(TaskCreationOptions.RunContinuationsAsynchronously);
-            refreshes[id]=completion.Task;
+            refreshes[(id,attachment)]=completion.Task;
         }
-        _=RefreshDongleCoreAsync(id,token,completion);
+        _=RefreshDongleCoreAsync(id,attachment,token,completion);
         return completion.Task;
     }
-    async Task RefreshDongleCoreAsync(string id,CancellationToken token,TaskCompletionSource completion)
+    async Task RefreshDongleCoreAsync(string id,long attachment,CancellationToken token,TaskCompletionSource completion)
     {
+        SemaphoreSlim operationLock;
+        lock(gate)
+        {
+            if(!operationLocks.TryGetValue(id,out operationLock!)) operationLocks[id]=operationLock=new(1,1);
+        }
         try
         {
-            var update=await backend.GetPeersAsync(id,token);
+            await operationLock.WaitAsync(token);
+            IReadOnlyList<PeerInfo> update;
+            try
+            {
+                lock(gate) if(!Attached(id,attachment)) return;
+                update=await backend.GetPeersAsync(id,token);
+            }
+            finally { operationLock.Release(); }
             lock(gate)
             {
-                if(!disposed && devices.Any(d=>d.Id==id && d.CanPair))
+                if(Attached(id,attachment))
                 {
                     peerSnapshots[id]=new(id,update.ToArray());
                     if(selected==id) peers=update.ToArray();
@@ -123,15 +147,15 @@ public sealed class DeviceSession : IAsyncDisposable
         {
             lock(gate)
             {
-                if(!disposed && peerSnapshots.TryGetValue(id,out var last))
+                if(Attached(id,attachment) && peerSnapshots.TryGetValue(id,out var last))
                     peerSnapshots[id]=last with { Error=FriendlyError(e) };
             }
         }
         finally
         {
-            lock(gate) refreshes.Remove(id);
-            completion.TrySetResult();
+            lock(gate) refreshes.Remove((id,attachment));
             Changed?.Invoke();
+            completion.TrySetResult();
         }
     }
     public Task RefreshDevicePropertiesAsync(string deviceId,CancellationToken token = default)
@@ -141,6 +165,12 @@ public sealed class DeviceSession : IAsyncDisposable
             if(disposed || !devices.Any(d=>d.Id==deviceId)) return Task.CompletedTask;
         }
         return backend.RefreshDevicePropertiesAsync(deviceId,token);
+    }
+    public async Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token=default)
+    {
+        lock(gate) if(disposed || !peerSnapshots.TryGetValue(dongleId,out var snapshot) || !snapshot.Peers.Any(p=>p.Id==peerId)) return;
+        await backend.RefreshPeerPropertiesAsync(dongleId,peerId,token);
+        await RefreshAsync(dongleId,token);
     }
     bool Current(string id,long epoch) => !disposed && selected==id && generation==epoch;
     async Task WithOperation(Func<string,long,Task> operation, string operationName = "operation", bool clearError = false, bool showActivity = true,
@@ -255,18 +285,58 @@ public sealed class DeviceSession : IAsyncDisposable
     public async Task RunAsync(string dongleId,string peerId,DeviceAction action,CancellationToken token = default)
     {
         SemaphoreSlim operationLock;
+        long attachment;
         lock(gate)
         {
-            if(disposed || !devices.Any(d=>d.Id==dongleId && d.CanPair)) return;
+            if(disposed || !attachments.TryGetValue(dongleId,out attachment)) return;
             if(!operationLocks.TryGetValue(dongleId,out operationLock!)) operationLocks[dongleId]=operationLock=new(1,1);
         }
-        await operationLock.WaitAsync(token);
+        diagnostic($"operation={action.ToString().ToLowerInvariant()} dongle={dongleId} state=waiting-for-dongle-lock");
+        try { await operationLock.WaitAsync(token); }
+        catch(OperationCanceledException) { return; }
+        bool active=false;
         try
         {
-            await backend.ExecuteAsync(dongleId,peerId,action,token);
-            await RefreshDongleAsync(dongleId,CancellationToken.None);
+            lock(gate)
+            {
+                if(!Attached(dongleId,attachment)) return;
+                var source=action==DeviceAction.Pair && selected==dongleId ? results : peerSnapshots[dongleId].Peers;
+                if(!source.Any(p=>p.Id==peerId))
+                    throw new InvalidOperationException("Gerät nicht mehr verfügbar. Bitte aktualisieren oder erneut suchen.");
+                foregroundBusy.Add(dongleId); active=true;
+                peerSnapshots[dongleId]=peerSnapshots[dongleId] with { Error=null };
+            }
+            Changed?.Invoke();
+            Exception? failure=null;
+            try { await backend.ExecuteAsync(dongleId,peerId,action,token); }
+            catch(Exception e) { failure=e; }
+            try
+            {
+                lock(gate) if(!Attached(dongleId,attachment)) return;
+                var update=await backend.GetPeersAsync(dongleId,CancellationToken.None);
+                lock(gate) if(Attached(dongleId,attachment))
+                {
+                    peerSnapshots[dongleId]=new(dongleId,update.ToArray());
+                    if(selected==dongleId) peers=update.ToArray();
+                }
+            }
+            catch(Exception e) { failure ??=e; }
+            if(failure is not null) throw failure;
         }
-        finally { operationLock.Release(); }
+        catch(Exception e)
+        {
+            lock(gate) if(Attached(dongleId,attachment))
+            {
+                peerSnapshots[dongleId]=peerSnapshots[dongleId] with { Error=FriendlyError(e) };
+                if(selected==dongleId) error=FriendlyError(e);
+            }
+        }
+        finally
+        {
+            lock(gate) if(active) foregroundBusy.Remove(dongleId);
+            operationLock.Release();
+            Changed?.Invoke();
+        }
     }
     public static string FriendlyError(Exception e) => e switch
     {

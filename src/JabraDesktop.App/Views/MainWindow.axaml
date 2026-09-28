@@ -24,8 +24,7 @@
     </Grid>
    </Border>
   </DataTemplate>
- </Window.DataTemplates>
- <Window.DataTemplates>
+
   <DataTemplate DataType="vm:DongleTreeItemViewModel" x:DataType="vm:DongleTreeItemViewModel">
    <StackPanel Spacing="9" Margin="0,0,0,18">
     <Button Command="{Binding Device.SelectCommand}" HorizontalContentAlignment="Left" Padding="10,8" Background="Transparent">
@@ -35,11 +34,21 @@
      </StackPanel>
     </Button>
     <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
-    <ItemsControl ItemsSource="{Binding Peers}" Margin="14,0,0,0" />
+    <ItemsControl ItemsSource="{Binding Peers}" Margin="14,0,0,0">
+     <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PeerRow">
+      <ToggleButton Classes="navPeer" IsChecked="{Binding IsSelected, Mode=OneWay}" Command="{Binding SelectCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="10,9" Margin="0,2">
+       <StackPanel Spacing="4">
+        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Status}" Classes="muted" FontSize="11" />
+        <TextBlock IsVisible="{Binding HasTelemetry}" Text="{Binding TelemetrySummary}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+       </StackPanel>
+      </ToggleButton>
+     </DataTemplate></ItemsControl.ItemTemplate>
+    </ItemsControl>
    </StackPanel>
   </DataTemplate>
  </Window.DataTemplates>
- <Grid ColumnDefinitions="250,*">
+ <Grid ColumnDefinitions="290,*">
   <Border Background="{DynamicResource SideBrush}" Padding="22,30">
    <Grid RowDefinitions="Auto,Auto,*,Auto">
     <StackPanel Spacing="8" Margin="8,0,0,36">
@@ -86,10 +95,10 @@
      <ItemsControl ItemsSource="{Binding Peers}" />
      <TextBlock Text="{Binding Texts[NoPairs]}" IsVisible="{Binding NoPeers}" Classes="muted" TextWrapping="Wrap" />
     </StackPanel>
-    <Border Classes="card" IsVisible="{Binding IsEndpointSelected}">
+    <Border Classes="card" IsVisible="{Binding ShowEndpointStatus}">
      <StackPanel Spacing="14">
       <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" />
-      <StackPanel Orientation="Horizontal" Spacing="8">
+      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEndpointSelected}">
        <Button Content="{Binding SelectedPeer.ActionLabel}" Command="{Binding SelectedPeer.ActionCommand}" />
        <Button Content="{Binding Texts[Unpair]}" Command="{Binding SelectedPeer.UnpairCommand}" />
       </StackPanel>
@@ -101,12 +110,14 @@
      <TextBlock Text="{Binding SearchSummary}" Classes="muted" TextWrapping="Wrap" />
      <ItemsControl ItemsSource="{Binding Results}" />
     </StackPanel>
-    <Border Classes="card" IsVisible="{Binding HasDevice}">
-     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="20" RowSpacing="12">
-      <StackPanel Spacing="8" IsVisible="{Binding ShowBattery}"><TextBlock Text="{Binding Texts[Battery]}" Classes="eyebrow" /><TextBlock Text="{Binding BatteryText}" Classes="muted" /></StackPanel>
-      <StackPanel Grid.Column="1" Spacing="8" IsVisible="{Binding ShowFirmware}"><TextBlock Text="{Binding Texts[Firmware]}" Classes="eyebrow" /><TextBlock Text="{Binding FirmwareText}" Classes="muted" /></StackPanel>
-      <Button Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" Content="{Binding RefreshPropertiesText}" IsVisible="{Binding CanRefreshProperties}" Command="{Binding RefreshPropertiesCommand}" />
-     </Grid>
+    <Border Classes="card" IsVisible="{Binding HasProperties}">
+     <StackPanel Spacing="14">
+      <WrapPanel Orientation="Horizontal">
+       <StackPanel Spacing="8" MinWidth="200" Margin="0,0,20,8" IsVisible="{Binding ShowBattery}"><TextBlock Text="{Binding Texts[Battery]}" Classes="eyebrow" /><TextBlock Text="{Binding BatteryText}" Classes="muted" /></StackPanel>
+       <StackPanel Spacing="8" MinWidth="200" IsVisible="{Binding ShowFirmware}"><TextBlock Text="{Binding Texts[Firmware]}" Classes="eyebrow" /><TextBlock Text="{Binding FirmwareText}" Classes="muted" /></StackPanel>
+      </WrapPanel>
+      <Button HorizontalAlignment="Left" Content="{Binding RefreshPropertiesText}" IsVisible="{Binding CanRefreshProperties}" Command="{Binding RefreshPropertiesCommand}" />
+     </StackPanel>
     </Border>
     <TextBlock Text="{Binding Texts[FeatureDependsOnDevice]}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
    </StackPanel>

@@ -61,6 +61,47 @@ public class ViewModelTests
         vm.SelectedPeer=null;
         Assert.False(vm.ShowBattery);
     }
+    [Fact] public async Task StartupAndPeriodicRefreshLoadAllDongleGroups()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true),new DeviceInfo("b","Link 380",true));
+        backend.PeersByDongle["a"]=[new("pa","Speaker",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("pb","Headset",LinkState.Disconnected)];
+        await vm.StartAsync();
+        Assert.Equal(2,session.PeerSnapshots.Count);
+        backend.PeersByDongle["a"]=[new("pa2","Speaker 2",LinkState.Connected)];
+        await vm.RefreshAsync();
+        Assert.Contains("pa2",session.PeerSnapshots.Single(x=>x.DongleId=="a").Peers.Select(x=>x.Id));
+        Assert.Equal("pb",Assert.Single(session.PeerSnapshots.Single(x=>x.DongleId=="b").Peers).Id);
+    }
+    [Fact] public async Task TransientFailureDoesNotRemoveOtherDongleChildren()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("a","Link",true),new DeviceInfo("b","Link",true));
+        backend.PeersByDongle["a"]=[new("pa","Speaker",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("pb","Headset",LinkState.Connected)];
+        await session.RefreshAllAsync();
+        backend.PeerErrors["a"]=new IOException("temporary");
+        await vm.RefreshAsync();
+        Assert.Equal("pa",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="a").Peers).Peer.Id);
+        Assert.Equal("pb",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="b").Peers).Peer.Id);
+    }
+    [Fact] public async Task PendingEndpointActionDoesNotOverwriteAnotherGroup()
+    {
+        var backend=new FakeBackend { OperationCompletion=new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("a","Link",true),new DeviceInfo("b","Link",true));
+        backend.PeersByDongle["a"]=[new("pa","Speaker A",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("pb","Speaker B",LinkState.Connected)];
+        await session.RefreshAllAsync();
+        var action=session.RunAsync("a","pa",DeviceAction.Disconnect);
+        await Task.Delay(20);
+        backend.PeersByDongle["b"]=[new("pb2","Speaker B2",LinkState.Disconnected)];
+        await session.RefreshAsync("b");
+        backend.OperationCompletion.SetResult();
+        await action;
+        Assert.Equal("pb2",Assert.Single(session.PeerSnapshots.Single(x=>x.DongleId=="b").Peers).Id);
+    }
     [Fact] public void CapableDongleEnablesSearch()
     {
         var b=new FakeBackend(); var s=new DeviceSession(b); var vm=new MainViewModel(s,a=>a());

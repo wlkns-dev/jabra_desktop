@@ -95,7 +95,7 @@ public partial class App : Application
             refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
             refreshTimer.Tick += async (_, _) =>
             {
-                if (viewModel?.CanScan == true) await viewModel.RefreshAsync();
+                if (viewModel is not null && !viewModel.IsScanning) await viewModel.RefreshAsync();
             };
             trayMonitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
             trayMonitorTimer.Tick += async (_, _) => await RefreshTrayAvailabilityAsync();

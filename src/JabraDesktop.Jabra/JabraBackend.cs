@@ -20,6 +20,11 @@ public sealed class JabraBackend : IDeviceBackend
         public IBluetoothDongle? Dongle { get; set; }
         public RetryableInitialization<IBluetoothDongle?> Capability { get; } = new();
         public ConcurrentDictionary<string,IBluetoothAddress> Addresses { get; } = new();
+        public string[] ChildAddresses { get; set; } = [];
+        public Task? ChildDiscovery { get; set; }
+        public DateTimeOffset LastChildDiscovery { get; set; }
+        public Task? PropertyRefresh { get; set; }
+        public DateTimeOffset LastPropertyRefresh { get; set; }
         public DeviceProperties Properties { get; set; } = new();
         public bool CanRefreshProperties { get; set; }
         public ConcurrentDictionary<DevicePropertyValueKind, DevicePropertyReadRunner> PropertyReadRunners { get; } = new();
@@ -95,6 +100,7 @@ public sealed class JabraBackend : IDeviceBackend
             refreshProperties=entry.CanRefreshProperties;
         }
         Publish();
+        if(entry.Dongle is null) _=DiscoverChildAsync(entry);
         if(refreshProperties) await RefreshPropertiesAsync(entry,CancellationToken.None);
     }
     void UpdatePropertyCapability(DeviceEntry entry)
@@ -154,22 +160,77 @@ public sealed class JabraBackend : IDeviceBackend
         DeviceEntry? entry;
         lock(gate) entry=entries.Values.FirstOrDefault(e=>e.Id==deviceId && e.CanRefreshProperties);
         if(entry==null) return;
-        await RefreshPropertiesAsync(entry,token);
+        await RefreshPropertiesAsync(entry,token,force:true);
     }
-    async Task RefreshPropertiesAsync(DeviceEntry entry,CancellationToken token)
+    Task DiscoverChildAsync(DeviceEntry entry)
     {
-        foreach (var capability in DevicePropertyCapabilities.For(entry.BaseInfo))
+        lock(gate)
         {
-            var runner = entry.PropertyReadRunners.GetOrAdd(capability.ValueKind, _ => new DevicePropertyReadRunner());
-            var value=await runner.ReadAsync(
-                ()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),token);
-            lock(gate)
+            if(entry.ChildDiscovery is {IsCompleted:false} || DateTimeOffset.UtcNow-entry.LastChildDiscovery < TimeSpan.FromSeconds(30)) return entry.ChildDiscovery ?? Task.CompletedTask;
+            entry.LastChildDiscovery=DateTimeOffset.UtcNow;
+            return entry.ChildDiscovery=Task.Run(async ()=>
             {
-                if(disposed || !entries.Values.Contains(entry)) return;
-                entry.Properties = DevicePropertyValueUpdate.Apply(entry.Properties, capability, value);
-            }
-            Publish();
+                try
+                {
+                    var child=await module!.TryCreateBluetoothChildDevice(entry.Source);
+                    lock(gate) if(!disposed && entries.Values.Contains(entry))
+                        entry.ChildAddresses=child?.AllAddresses.Select(a=>a.AsHexString()).ToArray() ?? [];
+                }
+                catch(Exception) { /* Optional child metadata cannot fail pairing inventory. */ }
+            });
         }
+    }
+    static bool IsChildOf(DeviceEntry child,DeviceEntry parent) => child.Source.CurrentConnections.Any(connection =>
+    {
+        var ancestor=connection.ParentConnection;
+        for(var depth=0;ancestor is not null && depth<8;depth++,ancestor=ancestor.ParentConnection)
+            if(ancestor.Device.Id.Id.Equals(parent.Source.Id.Id)) return true;
+        return false;
+    });
+    DeviceEntry? ResolvePeer(DeviceEntry parent,IBluetoothAddress address)
+    {
+        var key=address.AsHexString();
+        return entries.Values.FirstOrDefault(e=>e.ChildAddresses.Contains(key) && IsChildOf(e,parent));
+    }
+    Task RefreshPropertiesAsync(DeviceEntry entry,CancellationToken token,bool force=false)
+    {
+        Task refresh;
+        lock(gate)
+        {
+            if(entry.PropertyRefresh is {IsCompleted:false}) refresh=entry.PropertyRefresh;
+            else if(!force && DateTimeOffset.UtcNow-entry.LastPropertyRefresh<TimeSpan.FromSeconds(30)) return Task.CompletedTask;
+            else
+            {
+                entry.LastPropertyRefresh=DateTimeOffset.UtcNow;
+                refresh=entry.PropertyRefresh=Task.Run(async ()=>
+                {
+                    await Task.WhenAll(DevicePropertyCapabilities.For(entry.BaseInfo).Select(async capability=>
+                    {
+                        var runner=entry.PropertyReadRunners.GetOrAdd(capability.ValueKind,_=>new DevicePropertyReadRunner());
+                        var value=await runner.ReadAsync(()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),CancellationToken.None);
+                        lock(gate)
+                        {
+                            if(disposed || !entries.Values.Contains(entry)) return;
+                            entry.Properties=DevicePropertyValueUpdate.Apply(entry.Properties,capability,value);
+                        }
+                        Publish();
+                    }));
+                });
+            }
+        }
+        return refresh.WaitAsync(token);
+    }
+    public async Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token)
+    {
+        var parent=Find(dongleId);
+        if(!parent.Addresses.TryGetValue(peerId,out var address)) return;
+        DeviceEntry[] candidates;
+        lock(gate) candidates=entries.Values.Where(e=>e.Dongle is null && IsChildOf(e,parent)).ToArray();
+        try { await Task.WhenAll(candidates.Select(DiscoverChildAsync)).WaitAsync(TimeSpan.FromSeconds(3),token); }
+        catch(TimeoutException) { return; }
+        DeviceEntry? child;
+        lock(gate) child=ResolvePeer(parent,address);
+        if(child?.CanRefreshProperties==true) await RefreshPropertiesAsync(child,token,force:true);
     }
     static string Remember(DeviceEntry entry,IBluetoothAddress address)
     {
@@ -200,10 +261,19 @@ public sealed class JabraBackend : IDeviceBackend
                 BatteryApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.BatteryPercent),
                 FirmwareApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.Firmware),
                 CanRefresh: false);
-            // The SDK exposes paired peers as IBluetoothChildDevice, not IDevice. Its
-            // property API only accepts IDevice, so keep applicable values explicitly unavailable.
-            result.Add(new PeerInfo(peerId, DeviceMapper.DisplayName(peer.BluetoothName),
-                DeviceMapper.State(peer.ConnectionStatus), properties));
+            DeviceEntry? child;
+            DeviceEntry[] candidates;
+            lock(gate)
+            {
+                child=ResolvePeer(entry,peer.BluetoothAddress);
+                candidates=entries.Values.Where(e=>e.Dongle is null && IsChildOf(e,entry)).ToArray();
+                if(child is not null) properties=child.Properties;
+            }
+            foreach(var candidate in candidates) _=DiscoverChildAsync(candidate);
+            if(child?.CanRefreshProperties==true && DeviceMapper.State(peer.ConnectionStatus)==LinkState.Connected)
+                _=RefreshPropertiesAsync(child,CancellationToken.None);
+            result.Add(new PeerInfo(peerId,DeviceMapper.DisplayName(peer.BluetoothName),
+                DeviceMapper.State(peer.ConnectionStatus),properties,child?.Id));
         }
         return result;
     }

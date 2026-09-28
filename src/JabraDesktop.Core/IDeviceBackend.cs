@@ -6,6 +6,7 @@ public interface IDeviceBackend : IAsyncDisposable
     Task StartAsync(CancellationToken token);
     Task<IReadOnlyList<PeerInfo>> GetPeersAsync(string dongleId, CancellationToken token);
     Task RefreshDevicePropertiesAsync(string deviceId, CancellationToken token) => Task.CompletedTask;
+    Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token) => Task.CompletedTask;
     IAsyncEnumerable<PeerInfo> ScanAsync(string dongleId, CancellationToken token);
     Task ExecuteAsync(string dongleId, string peerId, DeviceAction action, CancellationToken token);
 }

@@ -7,5 +7,5 @@ public record DeviceProperties(bool BatteryApplicable = false, int? BatteryPerce
 public record DeviceInfo(string Id, string Name, bool CanPair, int? BatteryPercent = null, string? Firmware = null,
     DeviceRole Role = DeviceRole.Unknown, int? VendorId = null, int? ProductId = null, bool CanRefreshProperties = false,
     DeviceProperties? Properties = null);
-public record PeerInfo(string Id, string Name, LinkState State, DeviceProperties? Properties = null);
+public record PeerInfo(string Id, string Name, LinkState State, DeviceProperties? Properties = null, string? SourceDeviceId = null);
 public record DonglePeerSnapshot(string DongleId, IReadOnlyList<PeerInfo> Peers, string? Error = null);

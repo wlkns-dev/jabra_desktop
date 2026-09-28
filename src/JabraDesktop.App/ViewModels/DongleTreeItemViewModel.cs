@@ -17,10 +17,18 @@ public sealed class DongleTreeItemViewModel : ObservableObject
     public void Update(DonglePeerSnapshot snapshot, Func<PeerInfo, PeerRow> createRow)
     {
         Error = snapshot.Error;
-        if (!Peers.Select(p => p.Peer).SequenceEqual(snapshot.Peers))
+        for(var i=Peers.Count-1;i>=0;i--) if(!snapshot.Peers.Any(p=>p.Id==Peers[i].Peer.Id)) Peers.RemoveAt(i);
+        for(var target=0;target<snapshot.Peers.Count;target++)
         {
-            Peers.Clear();
-            foreach (var peer in snapshot.Peers) Peers.Add(createRow(peer));
+            var peer=snapshot.Peers[target];
+            var existing=Peers.FirstOrDefault(p=>p.Peer.Id==peer.Id);
+            if(existing is null) Peers.Insert(target,createRow(peer));
+            else
+            {
+                existing.Update(peer);
+                var index=Peers.IndexOf(existing);
+                if(index!=target) Peers.Move(index,target);
+            }
         }
         OnPropertyChanged(nameof(Error));
         OnPropertyChanged(nameof(HasError));

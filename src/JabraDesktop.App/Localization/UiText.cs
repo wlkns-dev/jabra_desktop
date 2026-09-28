@@ -81,7 +81,8 @@ public enum UiText
     Cancel,
     Unpair,
     UnpairQuestion,
-    UnpairDescription
-    ,DongleRefreshError,
+    UnpairDescription,
+    ViaDongle,
+    DongleRefreshError,
     StandaloneDevices
 }

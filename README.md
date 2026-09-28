@@ -1,8 +1,9 @@
 # Jabra Desktop für Linux
 
-Deutschsprachige Desktop-App zum Verwalten von Jabra-Bluetooth-Dongles.
-Mit Gerätesuche, Koppeln, Verbinden, Trennen und gezieltem Entkoppeln,
-heller/dunkler Oberfläche und automatischer Geräteerkennung.
+Deutsch/englische Desktop-App zum Verwalten mehrerer Jabra-Bluetooth-Dongles.
+Dongles erscheinen mit eingerückten, zugehörigen Headsets und Speakern. Geräte
+lassen sich suchen, koppeln, verbinden, trennen und gezielt entkoppeln. Die App
+bietet eine helle/dunkle Oberfläche und automatische Geräteerkennung.
 
 ## Starten
 
@@ -71,12 +72,12 @@ sudo pacman -U "$package_file"
 ```
 
 Fertige Arch-Pakete werden als Assets in den [GitHub Releases](https://github.com/wlkns-dev/jabra_desktop/releases)
-bereitgestellt. Für Release `v0.4.1` lädst du das Paket herunter und installierst
+bereitgestellt. Für Release `v0.5.0` lädst du das Paket herunter und installierst
 es zum Beispiel so:
 
 ```bash
-curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.4.1/jabra-desktop-0.4.1-1-x86_64.pkg.tar.zst
-sudo pacman -U ./jabra-desktop-0.4.1-1-x86_64.pkg.tar.zst
+curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.5.0/jabra-desktop-0.5.0-1-x86_64.pkg.tar.zst
+sudo pacman -U ./jabra-desktop-0.5.0-1-x86_64.pkg.tar.zst
 ```
 
 ## Ubuntu-Paket
@@ -86,14 +87,14 @@ Für Ubuntu 22.04, 24.04 und 26.04 auf amd64 kannst du das `.deb` aus dem
 und mit APT installieren:
 
 ```bash
-sudo apt install ./jabra-desktop_0.4.1_amd64.deb
+sudo apt install ./jabra-desktop_0.5.0_amd64.deb
 ```
 
 Aus einem Quellcheckout lässt sich das Paket mit `./scripts/package-deb.sh`
 erstellen. Nach der Installation der USB-Regel den Dongle einmal abziehen und
 wieder einstecken, damit die Geräteberechtigung greift.
 
-Softwarestände verwenden annotierte Git-Tags wie `v0.4.1`. Die Version in
+Softwarestände verwenden annotierte Git-Tags wie `v0.5.0`. Die Version in
 `Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
 für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater
 gibt es nicht. AUR und ein automatisiertes Pacman-Repository sind noch nicht
@@ -114,22 +115,28 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
 
 ## Geräte verwenden
 
-1. Link-Dongle einstecken; links den gewünschten Dongle auswählen.
-2. Gespeicherte Geräte rechts verbinden oder trennen.
+1. Einen oder mehrere Link-Dongles einstecken. Jeder Dongle erscheint links als
+   eigene Gruppe; gespeicherte Geräte stehen darunter, auch wenn sie gerade
+   getrennt sind.
+2. Ein Headset oder einen Speaker auswählen. Rechts erscheinen Status, passende
+   Gerätewerte und die Aktionen Verbinden/Trennen sowie Entkoppeln. Bei Auswahl
+   des Dongles erscheinen Suche und Kopplungsübersicht.
 3. Zum Hinzufügen das Headset in seinen Pairing-Modus schalten und
    **Gerät hinzufügen** wählen. Suche nach spätestens 30 Sekunden beendet;
    mit **Suche beenden** kann sie früher beendet werden.
 4. Anschließend am gefundenen Gerät **Koppeln** drücken.
 5. Über **⋯ → Entkoppeln** lässt sich eine einzelne Kopplung nach Bestätigung entfernen.
 
-Der Status wird nach Aktionen und im Ruhezustand alle vier Sekunden aktualisiert.
+Alle Dongle-Gruppen werden beim Start und anschließend alle vier Sekunden aktualisiert.
 Ein unbekannter Status wird niemals als bestätigte Verbindung ausgegeben.
 
-Akku- und Firmwarewerte werden bei unterstützten Geräten einmal beim Start und
-auf Knopfdruck gelesen. In Version 0.4.0 ist Firmware auf Link 380 und der
-Akkustand auf Evolve 75 SE beschränkt. Andere Modelle zeigen „Nicht verfügbar“;
-die Eigenschaftsunterstützung des Evolve 75 SE ist dokumentiert, aber auf dieser
-Hardware noch nicht bestätigt. Link 370 wird nicht freigeschaltet.
+Firmware wird für Dongles und Endgeräte, der Akku für Headsets und Speaker
+angezeigt, sofern das SDK die jeweilige Eigenschaft liefert. Ist eine Eigenschaft
+für die Geräteklasse relevant, aber nicht lesbar, erscheint „Nicht verfügbar“.
+Gepaarte Endgeräte werden anhand der SDK-Verbindung dem passenden Dongle
+zugeordnet. Ihre Werte werden im Hintergrund höchstens alle 30 Sekunden sowie
+auf Knopfdruck gelesen. Stellt das SDK kein auslesbares Endgerät bereit, bleiben
+die Werte ausdrücklich nicht verfügbar. Dongles zeigen kein Akku-Feld.
 
 ## USB-Berechtigungen
 
@@ -191,12 +198,12 @@ Zum Koppeln neuer Geräte bevorzugt die grafische Oberfläche verwenden. Alterna
 - Die Geräteübersicht zeigt die SDK-Rolle und die VID:PID-Kennung, sofern beide
   Werte verfügbar sind. Diese Kennungen unterscheiden Gerätemodelle, nicht zwei
   baugleiche Dongles.
-- Hardwarevalidierung: Link 380 und Evolve 75 SE. Link 370 und paralleler Betrieb
-  beider Dongles sind noch nicht getestet; Details stehen in
+- Hardwarevalidierung: Link 370 mit Speak 710 und Link 380 mit Evolve 75 SE
+  gleichzeitig, einschließlich Firmware- und Akkudaten; Details stehen in
   `docs/hardware-validation.md`.
 - USB-Headsets erscheinen in der Übersicht, besitzen aber keine Dongle-Suche.
-- Akku/Firmware werden nur für die in 0.4.0 freigegebenen Gerätemodelle gelesen;
-  weitere Modelle und Link 370 bleiben „Nicht verfügbar“.
+- Akku/Firmware werden nach Geräteklasse abgefragt. Manche Jabra-Modelle oder
+  Bluetooth-Profile liefern einzelne Werte über das SDK nicht.
 - Fremdhersteller werden bei Suchtreffern nicht ausgefiltert; Kompatibilität
   ist experimentell. DECT, BlueZ, Firmware-Updates und Audioeinstellungen folgen
   gegebenenfalls separat.

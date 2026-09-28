@@ -16,6 +16,8 @@ public sealed class FakeBackend : IDeviceBackend
     public TaskCompletionSource? ReadCompletion { get; set; }
     public TaskCompletionSource ReadStarted { get; }=new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource? PropertyRefreshCompletion { get; set; }
+    public List<(string Dongle,string Peer)> PeerPropertyRefreshCalls { get; }=[];
+    public Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token) { PeerPropertyRefreshCalls.Add((dongleId,peerId)); return Task.CompletedTask; }
     public List<string> PropertyRefreshCalls { get; }=[];
     public List<(string Dongle, string Peer, DeviceAction Action)> Calls { get; } = [];
     public int ScanStarted { get; private set; }

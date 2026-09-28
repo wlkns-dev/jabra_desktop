@@ -61,6 +61,8 @@ public class SessionTests
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend);
         backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        backend.PeersByDongle["b"]=[new("peer-b","Headset",LinkState.Connected)];
+        await session.RefreshAllAsync();
         await session.RunAsync("b","peer-b",DeviceAction.Disconnect);
         Assert.Contains(("b","peer-b",DeviceAction.Disconnect),backend.Calls);
     }
