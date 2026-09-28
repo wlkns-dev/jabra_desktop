@@ -84,6 +84,8 @@ public static class UiTextCatalog
         [UiText.Unpair] = "Entkoppeln",
         [UiText.UnpairQuestion] = "„{0}“ wirklich entkoppeln?",
         [UiText.UnpairDescription] = "Die gespeicherte Kopplung wird vom Dongle entfernt. Zum erneuten Verbinden ist Pairing nötig."
+        ,[UiText.DongleRefreshError] = "Die Geräteliste dieses Dongles konnte nicht aktualisiert werden."
+        ,[UiText.StandaloneDevices] = "Weitere Geräte"
     };
 
     static readonly IReadOnlyDictionary<UiText, string> English = new Dictionary<UiText, string>
@@ -168,6 +170,8 @@ public static class UiTextCatalog
         [UiText.Unpair] = "Unpair",
         [UiText.UnpairQuestion] = "Unpair “{0}”?",
         [UiText.UnpairDescription] = "The saved pairing will be removed from the dongle. Pair the headset again before reconnecting."
+        ,[UiText.DongleRefreshError] = "This dongle's device list could not be refreshed."
+        ,[UiText.StandaloneDevices] = "Other devices"
     };
 
     public static string Get(UiLanguage language, UiText key)

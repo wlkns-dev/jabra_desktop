@@ -66,6 +66,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         : Results.Count == 1 ? texts.Format(UiText.SearchFoundOne, Results.Count)
         : texts.Format(UiText.SearchFoundMany, Results.Count);
     public bool HasDevice => selectedDevice!=null;
+    public bool HasStandaloneDevices => StandaloneDevices.Count>0;
     public bool HasDongle => SelectedPeer is null && selectedDevice?.Device.CanPair==true;
     public bool IsEndpointSelected => SelectedPeer is not null;
     public bool NoPeers => HasDongle && Peers.Count==0;
@@ -85,6 +86,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public IAsyncRelayCommand RefreshCommand { get; }
     public IAsyncRelayCommand RefreshPropertiesCommand => refreshPropertiesCommand!;
     public IAsyncRelayCommand RetryCommand { get; }
+    public IRelayCommand<DeviceListItemViewModel> SelectDeviceCommand { get; }
     public MainViewModel(DeviceSession session, Action<Action> dispatch, LocalizationService? texts = null)
     {
         this.session = session;
@@ -98,6 +100,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             finally { IsScanning=false; OnPropertyChanged(nameof(SearchSummary)); }
         },()=>CanScan);
         CancelScanCommand=new RelayCommand(session.CancelScan);
+        SelectDeviceCommand=new RelayCommand<DeviceListItemViewModel>(device=>SelectedDevice=device);
         RefreshCommand=new AsyncRelayCommand(()=>session.RefreshAsync(),()=>CanScan);
         refreshPropertiesCommand=new AsyncRelayCommand(async () =>
         {
@@ -124,6 +127,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (disposed) return;
         NotifyState();
         foreach (var device in Devices) device.NotifyLocalizationChanged();
+        foreach (var dongle in Dongles) dongle.NotifyLocalizationChanged();
         foreach (var row in Peers.Concat(Results)) row.NotifyLocalizationChanged();
     });
     void Sync()
@@ -164,7 +168,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var info=dongleInfos[i];
             var item=Devices.First(d=>d.Device.Id==info.Id);
             var index=IndexOfDongle(info.Id);
-            if(index<0) Dongles.Insert(i,new(item));
+            if(index<0) Dongles.Insert(i,new(item,texts));
             else if(index!=i) Dongles.Move(index,i);
             var group=Dongles[i];
             var peerSnapshot=snapshots.FirstOrDefault(s=>s.DongleId==info.Id) ?? new(info.Id,[]);
@@ -177,6 +181,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var item=Devices.First(d=>d.Device.Id==info.Id);
             if(!StandaloneDevices.Contains(item)) StandaloneDevices.Add(item);
         }
+        OnPropertyChanged(nameof(HasStandaloneDevices));
     }
     int IndexOfDongle(string id) { for(var i=0;i<Dongles.Count;i++) if(Dongles[i].Device.Device.Id==id) return i; return -1; }
     void ReplaceDevices(IReadOnlyList<DeviceInfo> source)
@@ -190,7 +195,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var existingIndex=-1;
             for(var i=0;i<Devices.Count;i++)
                 if(Devices[i].Device.Id==info.Id) { existingIndex=i; break; }
-            if(existingIndex<0) Devices.Insert(target,new DeviceListItemViewModel(info,texts));
+            if(existingIndex<0) Devices.Insert(target,new DeviceListItemViewModel(info,texts,()=>SelectedDevice=Devices.FirstOrDefault(d=>d.Device.Id==info.Id)));
             else
             {
                 Devices[existingIndex].Update(info);
@@ -205,10 +210,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             rows.Clear(); foreach(var p in source) rows.Add(new PeerRow(p,found,this));
         }
         foreach(var row in rows) row.NotifyEnabled();
+        foreach(var group in Dongles) foreach(var row in group.Peers) row.NotifyEnabled();
     }
     void NotifyState()
     {
-        foreach(var name in new[]{nameof(CanScan),nameof(CanRefreshProperties),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(IsEndpointSelected),nameof(ShowDeviceOverview),nameof(ShowBattery),nameof(ShowFirmware),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(RefreshPropertiesText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary)}) OnPropertyChanged(name);
+        foreach(var name in new[]{nameof(CanScan),nameof(CanRefreshProperties),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(IsEndpointSelected),nameof(ShowDeviceOverview),nameof(ShowBattery),nameof(ShowFirmware),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(RefreshPropertiesText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary),nameof(HasStandaloneDevices)}) OnPropertyChanged(name);
         ScanCommand.NotifyCanExecuteChanged(); RefreshCommand.NotifyCanExecuteChanged(); RefreshPropertiesCommand.NotifyCanExecuteChanged();
     }
     internal async Task ActAsync(PeerInfo peer,DeviceAction action,string dongleId)

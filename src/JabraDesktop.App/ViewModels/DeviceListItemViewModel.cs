@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using JabraDesktop.Core;
 
 namespace JabraDesktop.App.ViewModels;
@@ -6,6 +7,8 @@ namespace JabraDesktop.App.ViewModels;
 public sealed class DeviceListItemViewModel : ObservableObject
 {
     readonly LocalizationService texts;
+    readonly Action select;
+    public IRelayCommand SelectCommand { get; }
     public DeviceInfo Device { get; private set; }
     public string Name => Device.Name;
     public string StatusSummary => Device.CanPair ? texts[UiText.BluetoothDongleSubtitle] : texts[UiText.UsbDeviceSubtitle];
@@ -21,10 +24,12 @@ public sealed class DeviceListItemViewModel : ObservableObject
         ? $"VID {Device.VendorId!.Value:X4} · PID {Device.ProductId!.Value:X4}"
         : string.Empty;
 
-    public DeviceListItemViewModel(DeviceInfo device, LocalizationService texts)
+    public DeviceListItemViewModel(DeviceInfo device, LocalizationService texts, Action? select = null)
     {
         Device = device;
         this.texts = texts;
+        this.select=select ?? (()=>{});
+        SelectCommand=new RelayCommand(()=>this.select());
     }
 
     public void Update(DeviceInfo device)

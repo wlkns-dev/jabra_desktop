@@ -7,6 +7,14 @@ namespace JabraDesktop.Tests;
 
 public sealed class LocalizationServiceTests
 {
+    [Fact]
+    public void HierarchyLabelsExistInBothLanguages()
+    {
+        Assert.Equal("Weitere Geräte",UiTextCatalog.Get(UiLanguage.German,UiText.StandaloneDevices));
+        Assert.Equal("Other devices",UiTextCatalog.Get(UiLanguage.English,UiText.StandaloneDevices));
+        Assert.Contains("dongle",UiTextCatalog.Get(UiLanguage.English,UiText.DongleRefreshError),StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("dongle",UiTextCatalog.Get(UiLanguage.German,UiText.DongleRefreshError),StringComparison.OrdinalIgnoreCase);
+    }
     [Theory]
     [InlineData(UiLanguage.German, UiText.RefreshDeviceStatus, "Gerätestatus aktualisieren")]
     [InlineData(UiLanguage.German, UiText.RefreshingDeviceStatus, "Status wird aktualisiert …")]

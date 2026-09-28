@@ -82,4 +82,6 @@ public enum UiText
     Unpair,
     UnpairQuestion,
     UnpairDescription
+    ,DongleRefreshError,
+    StandaloneDevices
 }

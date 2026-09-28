@@ -46,6 +46,21 @@ public class ViewModelTests
         await row.ActionCommand.ExecuteAsync(null);
         Assert.Contains(("dongle","peer",DeviceAction.Connect),backend.Calls);
     }
+    [Fact] public async Task EndpointShowsApplicablePropertiesAndHidesUnsupportedFields()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new PeerInfo("peer","Speaker",LinkState.Connected,
+            new DeviceProperties(BatteryApplicable:true,FirmwareApplicable:true))];
+        await session.RefreshAllAsync();
+        vm.Dongles[0].Peers[0].Select();
+        Assert.True(vm.ShowBattery);
+        Assert.True(vm.ShowFirmware);
+        Assert.Equal(vm.Texts[JabraDesktop.App.UiText.BatteryUnavailable],vm.BatteryText);
+        Assert.Equal(vm.Texts[JabraDesktop.App.UiText.FirmwareUnavailable],vm.FirmwareText);
+        vm.SelectedPeer=null;
+        Assert.False(vm.ShowBattery);
+    }
     [Fact] public void CapableDongleEnablesSearch()
     {
         var b=new FakeBackend(); var s=new DeviceSession(b); var vm=new MainViewModel(s,a=>a());
