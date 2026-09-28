@@ -11,13 +11,14 @@ public class ViewModelTests
         backend.PeersByDongle["b"]=[new("pb","Headset",LinkState.Disconnected)];
         await session.RefreshAllAsync();
         Assert.Equal("pa",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="a").Peers).Peer.Id);
-        Assert.Equal("pb",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="b").Peers).Peer.Id);
+        Assert.Empty(vm.Dongles.Single(x=>x.Device.Device.Id=="b").Peers);
+        Assert.Equal("pb",Assert.Single(session.PeerSnapshots.Single(x=>x.DongleId=="b").Peers).Id);
     }
     [Fact] public async Task SelectingPeerSelectsItsParentDongle()
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
         backend.EmitDevices(new DeviceInfo("dongle","Link",true));
-        backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Disconnected)];
+        backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Connected)];
         await session.RefreshAllAsync();
         vm.Dongles[0].Peers[0].Select();
         Assert.Equal("peer",vm.SelectedPeer?.Peer.Id);
@@ -41,7 +42,8 @@ public class ViewModelTests
         backend.EmitDevices(new DeviceInfo("dongle","Link",true));
         backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Disconnected)];
         await session.RefreshAllAsync();
-        var row=Assert.Single(vm.Dongles[0].Peers);
+        Assert.Empty(vm.Dongles[0].Peers);
+        var row=Assert.Single(vm.Peers);
         Assert.Equal(vm.Texts[JabraDesktop.App.UiText.Connect],row.ActionLabel);
         await row.ActionCommand.ExecuteAsync(null);
         Assert.Contains(("dongle","peer",DeviceAction.Connect),backend.Calls);
