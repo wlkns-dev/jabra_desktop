@@ -84,5 +84,10 @@ public enum UiText
     UnpairDescription,
     ViaDongle,
     DongleRefreshError,
-    StandaloneDevices
+    StandaloneDevices,
+    RenameBluetooth,
+    RenameBluetoothWindowTitle,
+    RenameBluetoothDescription,
+    BluetoothNameLabel,
+    Save
 }

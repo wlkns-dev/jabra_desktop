@@ -116,8 +116,8 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
 ## Geräte verwenden
 
 1. Einen oder mehrere Link-Dongles einstecken. Jeder Dongle erscheint links als
-   eigene Gruppe; gespeicherte Geräte stehen darunter, auch wenn sie gerade
-   getrennt sind.
+   eigene Gruppe; gerade verbundene Geräte stehen darunter. Getrennte,
+   gespeicherte Geräte stehen in der Kopplungsübersicht des Dongles.
 2. Ein Headset oder einen Speaker auswählen. Rechts erscheinen Status, passende
    Gerätewerte und die Aktionen Verbinden/Trennen sowie Entkoppeln. Bei Auswahl
    des Dongles erscheinen Suche und Kopplungsübersicht.
@@ -126,6 +126,11 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
    mit **Suche beenden** kann sie früher beendet werden.
 4. Anschließend am gefundenen Gerät **Koppeln** drücken.
 5. Über **⋯ → Entkoppeln** lässt sich eine einzelne Kopplung nach Bestätigung entfernen.
+6. Unterstützt ein verbundenes Headset die beschreibbare Eigenschaft
+   `bluetoothName`, kannst du seinen Bluetooth-Namen über **⋯ → Bluetooth-Namen
+   ändern** oder in der Geräteansicht ändern. Der Name wird im Headset gespeichert;
+   bei der Suche kann er erst nach einer erneuten Verbindung erscheinen. Für
+   getrennte oder nicht unterstützte Geräte wird die Aktion nicht angeboten.
 
 Alle Dongle-Gruppen werden beim Start und anschließend alle vier Sekunden aktualisiert.
 Ein unbekannter Status wird niemals als bestätigte Verbindung ausgegeben.

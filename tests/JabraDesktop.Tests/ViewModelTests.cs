@@ -3,6 +3,29 @@ using JabraDesktop.App.ViewModels;
 namespace JabraDesktop.Tests;
 public class ViewModelTests
 {
+    [Fact] public async Task ConnectedSupportedPeerCanRenameItsBluetoothName()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new("peer","Evolve 75",LinkState.Connected,CanRenameBluetooth:true)];
+        await session.RefreshAllAsync();
+        vm.PromptBluetoothName=name=>Task.FromResult<string?>(name=="Evolve 75" ? "Mein Evolve 75" : null);
+        var row=Assert.Single(vm.Dongles[0].Peers);
+        Assert.True(row.CanRenameBluetooth);
+        await row.RenameCommand.ExecuteAsync(null);
+        Assert.Contains(("dongle","peer","Mein Evolve 75"),backend.RenameCalls);
+        Assert.Equal("Mein Evolve 75",vm.Dongles[0].Peers[0].Name);
+    }
+    [Fact] public async Task UnsupportedPeerCannotOfferRename()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new("peer","Evolve 75",LinkState.Connected)];
+        await session.RefreshAllAsync();
+        var row=Assert.Single(vm.Dongles[0].Peers);
+        Assert.False(row.CanRenameBluetooth);
+        Assert.False(row.RenameCommand.CanExecute(null));
+    }
     [Fact] public async Task DongleTreeContainsOnlyItsOwnPeers()
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
