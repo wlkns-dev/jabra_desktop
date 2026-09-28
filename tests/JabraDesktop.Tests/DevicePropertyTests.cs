@@ -13,35 +13,73 @@ public class DevicePropertyTests
         new("session", name, false, Role: role, VendorId: vendorId, ProductId: productId);
 
     [Fact]
-    public void FindsFirmwareForLink380()
+    public void FirmwareIsConsideredForEveryDongle()
     {
-        var capability = DevicePropertyCapabilities.Find(Device(DeviceRole.Dongle, 0x0B0E, 0x24C7));
+        var capabilities = DevicePropertyCapabilities.For(Device(DeviceRole.Dongle, 0x0B0E, 0x245E, "Link 370"));
 
-        Assert.NotNull(capability);
-        Assert.Equal("firmwareVersion", capability.PropertyName);
+        Assert.Contains(capabilities, capability => capability.PropertyName == "firmwareVersion");
+        Assert.DoesNotContain(capabilities, capability => capability.PropertyName == "batteryLevel");
     }
 
     [Fact]
-    public void FindsBatteryForEvolve75Se()
+    public void HeadsetsAndSpeakersAreCheckedForBatteryAndFirmware()
     {
-        var capability = DevicePropertyCapabilities.Find(Device(DeviceRole.Headset, 0x0B0E, 0x2502));
+        foreach (var role in new[] { DeviceRole.Headset, DeviceRole.Other })
+        {
+            var capabilities = DevicePropertyCapabilities.For(Device(role, 0x0B0E, 0x2502));
 
-        Assert.NotNull(capability);
-        Assert.Equal("batteryLevel", capability.PropertyName);
+            Assert.Contains(capabilities, capability => capability.PropertyName == "batteryLevel");
+            Assert.Contains(capabilities, capability => capability.PropertyName == "firmwareVersion");
+        }
     }
 
     [Fact]
-    public void RejectsLink370AndUnknownIdentity()
+    public void UnknownDeviceRoleDoesNotProbeProperties()
     {
-        Assert.Null(DevicePropertyCapabilities.Find(Device(DeviceRole.Dongle, 0x0B0E, 0x1234, "Link 370")));
-        Assert.Null(DevicePropertyCapabilities.Find(Device(DeviceRole.Headset, null, null, "Evolve 75 SE")));
+        Assert.Empty(DevicePropertyCapabilities.For(Device(DeviceRole.Unknown, null, null)));
     }
 
     [Fact]
-    public void RejectsKnownIdsWithWrongRole()
+    public void PropertyValuesRetainApplicabilityAndAreUpdatedIndependently()
     {
-        Assert.Null(DevicePropertyCapabilities.Find(Device(DeviceRole.Headset, 0x0B0E, 0x24C7)));
-        Assert.Null(DevicePropertyCapabilities.Find(Device(DeviceRole.Dongle, 0x0B0E, 0x2502)));
+        var current = new DeviceProperties(BatteryApplicable: true, BatteryPercent: null,
+            FirmwareApplicable: true, Firmware: "2.0.0", CanRefresh: true);
+
+        var updated = DevicePropertyValueUpdate.Apply(current,
+            new DevicePropertyCapability("batteryLevel", DevicePropertyValueKind.BatteryPercent), null);
+
+        Assert.True(updated.BatteryApplicable);
+        Assert.Null(updated.BatteryPercent);
+        Assert.True(updated.FirmwareApplicable);
+        Assert.Equal("2.0.0", updated.Firmware);
+        Assert.True(updated.CanRefresh);
+    }
+
+    [Fact]
+    public void FailedBatteryReadDoesNotSuppressFirmware()
+    {
+        var current = new DeviceProperties(BatteryApplicable: true, FirmwareApplicable: true, Firmware: "2.0.0");
+        var afterBatteryFailure = DevicePropertyValueUpdate.Apply(current,
+            new DevicePropertyCapability("batteryLevel", DevicePropertyValueKind.BatteryPercent), null);
+
+        Assert.Null(afterBatteryFailure.BatteryPercent);
+        Assert.Equal("2.0.0", afterBatteryFailure.Firmware);
+        var afterFirmwareRead = DevicePropertyValueUpdate.Apply(afterBatteryFailure,
+            new DevicePropertyCapability("firmwareVersion", DevicePropertyValueKind.Firmware),
+            PropertyValue.FromString("2.1.0"));
+        Assert.Equal("2.1.0", afterFirmwareRead.Firmware);
+    }
+
+    [Fact]
+    public void ApplicableButUnreadPropertiesRemainExplicitlyUnavailable()
+    {
+        var current = new DeviceProperties(BatteryApplicable: true, BatteryPercent: null,
+            FirmwareApplicable: true, Firmware: null, CanRefresh: true);
+
+        Assert.True(current.BatteryApplicable);
+        Assert.Null(current.BatteryPercent);
+        Assert.True(current.FirmwareApplicable);
+        Assert.Null(current.Firmware);
     }
 
     [Fact]
@@ -123,15 +161,15 @@ public class DevicePropertyTests
     }
 
     [Fact]
-    public void RemovedDeviceDoesNotAcceptLatePropertyValue()
+    public void LatePropertyValueIsIgnoredAfterDeviceRemoval()
     {
-        var original = Device(DeviceRole.Headset, 0x0B0E, 0x2502);
+        var current = new DeviceProperties(BatteryApplicable: true, CanRefresh: true);
 
-        var updated = DevicePropertyValueUpdate.TryApply(original,
-            DevicePropertyCapabilities.Find(original)!, PropertyValue.FromInt32(82), isAttached: false);
+        var updated = DevicePropertyValueUpdate.TryApply(current,
+            new DevicePropertyCapability("batteryLevel", DevicePropertyValueKind.BatteryPercent), PropertyValue.FromInt32(82), isAttached: false);
 
         Assert.Null(updated);
-        Assert.Null(original.BatteryPercent);
+        Assert.Null(current.BatteryPercent);
     }
 
     sealed class FakePropertiesReader : IDevicePropertiesReader

@@ -15,14 +15,15 @@ internal sealed record DevicePropertyCapability(string PropertyName, DevicePrope
 
 internal static class DevicePropertyCapabilities
 {
-    static readonly DevicePropertyCapability link380Firmware = new("firmwareVersion", DevicePropertyValueKind.Firmware);
-    static readonly DevicePropertyCapability evolve75SeBattery = new("batteryLevel", DevicePropertyValueKind.BatteryPercent);
+    static readonly DevicePropertyCapability firmware = new("firmwareVersion", DevicePropertyValueKind.Firmware);
+    static readonly DevicePropertyCapability battery = new("batteryLevel", DevicePropertyValueKind.BatteryPercent);
 
-    public static DevicePropertyCapability? Find(DeviceInfo device) =>
-        (device.Role, device.VendorId, device.ProductId) switch
-        {
-            (DeviceRole.Dongle, 0x0B0E, 0x24C7) => link380Firmware,
-            (DeviceRole.Headset, 0x0B0E, 0x2502) => evolve75SeBattery,
-            _ => null
-        };
+    public static IReadOnlyList<DevicePropertyCapability> For(DeviceInfo device) => device.Role switch
+    {
+        DeviceRole.Dongle => [firmware],
+        DeviceRole.Headset or DeviceRole.Other => [firmware, battery],
+        _ => []
+    };
+
+    public static DevicePropertyCapability? Find(DeviceInfo device) => For(device).FirstOrDefault();
 }

@@ -20,15 +20,15 @@ public sealed class JabraBackend : IDeviceBackend
         public IBluetoothDongle? Dongle { get; set; }
         public RetryableInitialization<IBluetoothDongle?> Capability { get; } = new();
         public ConcurrentDictionary<string,IBluetoothAddress> Addresses { get; } = new();
-        public int? BatteryPercent { get; set; }
-        public string? Firmware { get; set; }
+        public DeviceProperties Properties { get; set; } = new();
         public bool CanRefreshProperties { get; set; }
-        public DevicePropertyReadRunner PropertyReadRunner { get; }=new();
-        public DeviceInfo BaseInfo => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,BatteryPercent,Firmware,
+        public ConcurrentDictionary<DevicePropertyValueKind, DevicePropertyReadRunner> PropertyReadRunners { get; } = new();
+        public DeviceInfo BaseInfo => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,
             Role:DeviceMapper.Role(Source.Type),
             VendorId:DeviceMapper.OptionalUsbId(Source.VendorId),
-            ProductId:DeviceMapper.OptionalUsbId(Source.ProductId));
-        public DeviceInfo Info => BaseInfo with { CanRefreshProperties=CanRefreshProperties };
+            ProductId:DeviceMapper.OptionalUsbId(Source.ProductId), Properties:Properties);
+        public DeviceInfo Info => BaseInfo with { CanRefreshProperties=CanRefreshProperties,
+            BatteryPercent=Properties.BatteryPercent, Firmware=Properties.Firmware };
     }
     readonly object gate=new();
     readonly Dictionary<string,DeviceEntry> entries=[];
@@ -97,8 +97,17 @@ public sealed class JabraBackend : IDeviceBackend
         Publish();
         if(refreshProperties) await RefreshPropertiesAsync(entry,CancellationToken.None);
     }
-    void UpdatePropertyCapability(DeviceEntry entry) =>
-        entry.CanRefreshProperties=propertiesInitialized && DevicePropertyCapabilities.Find(entry.BaseInfo)!=null;
+    void UpdatePropertyCapability(DeviceEntry entry)
+    {
+        var capabilities = DevicePropertyCapabilities.For(entry.BaseInfo);
+        entry.Properties = new DeviceProperties(
+            BatteryApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.BatteryPercent),
+            BatteryPercent: entry.Properties.BatteryPercent,
+            FirmwareApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.Firmware),
+            Firmware: entry.Properties.Firmware,
+            CanRefresh: propertiesInitialized && capabilities.Count > 0);
+        entry.CanRefreshProperties = entry.Properties.CanRefresh;
+    }
     void SlowOperation(string operation)
     {
         Trace.WriteLine($"{DateTimeOffset.Now:O} op={CurrentOperation} event=sdk-operation-slow operation={operation}");
@@ -149,19 +158,18 @@ public sealed class JabraBackend : IDeviceBackend
     }
     async Task RefreshPropertiesAsync(DeviceEntry entry,CancellationToken token)
     {
-        var capability=DevicePropertyCapabilities.Find(entry.BaseInfo);
-        if(capability==null) return;
-        var value=await entry.PropertyReadRunner.ReadAsync(
-            ()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),token);
-        lock(gate)
+        foreach (var capability in DevicePropertyCapabilities.For(entry.BaseInfo))
         {
-            if(disposed || !entries.Values.Contains(entry)) return;
-            var updated=DevicePropertyValueUpdate.TryApply(entry.Info,capability,value,isAttached:true);
-            if(updated is null) return;
-            entry.BatteryPercent=updated.BatteryPercent;
-            entry.Firmware=updated.Firmware;
+            var runner = entry.PropertyReadRunners.GetOrAdd(capability.ValueKind, _ => new DevicePropertyReadRunner());
+            var value=await runner.ReadAsync(
+                ()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),token);
+            lock(gate)
+            {
+                if(disposed || !entries.Values.Contains(entry)) return;
+                entry.Properties = DevicePropertyValueUpdate.Apply(entry.Properties, capability, value);
+            }
+            Publish();
         }
-        Publish();
     }
     static string Remember(DeviceEntry entry,IBluetoothAddress address)
     {
@@ -181,7 +189,23 @@ public sealed class JabraBackend : IDeviceBackend
         await SdkLifetime.AwaitCompletion(request,TimeSpan.FromSeconds(10),()=>SlowOperation($"get-pairing-list dongle={entry.Id}"),$"get-pairing-list dongle={entry.Id}");
         var peers=await request;
         Trace.WriteLine($"{DateTimeOffset.Now:O} op={CurrentOperation} event=sdk-call-complete operation=get-pairing-list dongle={entry.Id} count={peers.Count}");
-        return peers.Select(p=>new PeerInfo(Remember(entry,p.BluetoothAddress),DeviceMapper.DisplayName(p.BluetoothName),DeviceMapper.State(p.ConnectionStatus))).ToArray();
+        var result = new List<PeerInfo>(peers.Count);
+        foreach (var peer in peers)
+        {
+            var peerId = Remember(entry, peer.BluetoothAddress);
+            var info = new DeviceInfo(peerId, DeviceMapper.DisplayName(peer.BluetoothName), false,
+                Role: DeviceRole.Other);
+            var capabilities = DevicePropertyCapabilities.For(info);
+            var properties = new DeviceProperties(
+                BatteryApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.BatteryPercent),
+                FirmwareApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.Firmware),
+                CanRefresh: false);
+            // The SDK exposes paired peers as IBluetoothChildDevice, not IDevice. Its
+            // property API only accepts IDevice, so keep applicable values explicitly unavailable.
+            result.Add(new PeerInfo(peerId, DeviceMapper.DisplayName(peer.BluetoothName),
+                DeviceMapper.State(peer.ConnectionStatus), properties));
+        }
+        return result;
     }
     public async IAsyncEnumerable<PeerInfo> ScanAsync(string dongleId,[EnumeratorCancellation] CancellationToken token)
     {
