@@ -6,7 +6,7 @@ public class LifetimeTests
     [Fact] public async Task TimeoutReportsButRetainsLeaseUntilSdkSettles()
     {
         var sdk=new TaskCompletionSource(); var reported=new TaskCompletionSource();
-        var operation=SdkLifetime.AwaitCompletion(sdk.Task,TimeSpan.FromMilliseconds(10),()=>reported.TrySetResult());
+        var operation=SdkLifetime.AwaitCompletion(sdk.Task,TimeSpan.FromMilliseconds(10),()=>reported.TrySetResult(),"test-operation");
         await Task.WhenAny(reported.Task,operation).WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(reported.Task.IsCompletedSuccessfully); Assert.False(operation.IsCompleted);
         sdk.SetResult(); await operation;

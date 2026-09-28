@@ -1,9 +1,12 @@
+using System.Diagnostics;
+
 namespace JabraDesktop.Core;
 
 // All state changes are serialized; consumers receive immutable snapshots.
 public sealed class DeviceSession : IAsyncDisposable
 {
     readonly IDeviceBackend backend;
+    readonly Action<string> diagnostic;
     readonly object gate = new();
     readonly HashSet<string> busy = [];
     readonly HashSet<string> foregroundBusy = [];
@@ -15,9 +18,10 @@ public sealed class DeviceSession : IAsyncDisposable
     bool disposed, starting;
     CancellationTokenSource? scanCancel;
     public event Action? Changed;
-    public DeviceSession(IDeviceBackend backend)
+    public DeviceSession(IDeviceBackend backend, Action<string>? diagnostic = null)
     {
         this.backend = backend;
+        this.diagnostic = diagnostic ?? (message => Trace.WriteLine(message));
         backend.DevicesChanged += OnDevices;
         backend.Faulted += OnFault;
     }
@@ -73,7 +77,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 if(Current(id,epoch) && !peers.SequenceEqual(update)) { peers=update.ToArray(); changed=true; }
             }
             if(changed) Changed?.Invoke();
-        }, showActivity:false);
+        }, operationName:"refresh", showActivity:false);
     }
     public Task RefreshDevicePropertiesAsync(string deviceId,CancellationToken token = default)
     {
@@ -84,10 +88,12 @@ public sealed class DeviceSession : IAsyncDisposable
         return backend.RefreshDevicePropertiesAsync(deviceId,token);
     }
     bool Current(string id,long epoch) => !disposed && selected==id && generation==epoch;
-    async Task WithOperation(Func<string,long,Task> operation, bool clearError = false, bool showActivity = true,
+    async Task WithOperation(Func<string,long,Task> operation, string operationName = "operation", bool clearError = false, bool showActivity = true,
         CancellationToken operationToken = default)
     {
         string id; long epoch; SemaphoreSlim operationLock;
+        using var operationSpan = new Activity($"jabra.{operationName}").Start();
+        var operationId = operationSpan.TraceId.ToString()[..8];
         lock(gate)
         {
             if(disposed) return;
@@ -103,9 +109,13 @@ public sealed class DeviceSession : IAsyncDisposable
             }
         }
         if(id=="") { Changed?.Invoke(); operationLock.Dispose(); return; }
+        var waitStarted = Stopwatch.GetTimestamp();
+        diagnostic($"op={operationId} operation={operationName} dongle={id} state=waiting-for-dongle-lock");
         try { await operationLock.WaitAsync(operationToken); }
         catch(OperationCanceledException) { return; }
         catch(ObjectDisposedException) { return; }
+        diagnostic($"op={operationId} operation={operationName} dongle={id} state=lock-acquired wait_ms={Stopwatch.GetElapsedTime(waitStarted).TotalMilliseconds:F0}");
+        var operationStarted = Stopwatch.GetTimestamp();
         bool activity=false;
         try
         {
@@ -118,13 +128,14 @@ public sealed class DeviceSession : IAsyncDisposable
             }
             if(activity) Changed?.Invoke();
             try { await operation(id,epoch); }
-            catch(OperationCanceledException) { }
-            catch(Exception e) { lock(gate) if(Current(id,epoch)) error=FriendlyError(e); }
+            catch(OperationCanceledException) { diagnostic($"op={operationId} operation={operationName} dongle={id} state=cancelled"); }
+            catch(Exception e) { diagnostic($"op={operationId} operation={operationName} dongle={id} state=failed error={e.GetType().Name}"); lock(gate) if(Current(id,epoch)) error=FriendlyError(e); }
         }
         finally
         {
             lock(gate) { busy.Remove(id); foregroundBusy.Remove(id); }
             operationLock.Release();
+            diagnostic($"op={operationId} operation={operationName} dongle={id} state=completed duration_ms={Stopwatch.GetElapsedTime(operationStarted).TotalMilliseconds:F0}");
             if(activity) Changed?.Invoke();
         }
     }
@@ -157,7 +168,7 @@ public sealed class DeviceSession : IAsyncDisposable
                     }
                     Changed?.Invoke();
                 }
-            }, clearError: true, operationToken: cancel.Token);
+            }, operationName:"scan", clearError: true, operationToken: cancel.Token);
         }
         finally
         {
@@ -185,7 +196,7 @@ public sealed class DeviceSession : IAsyncDisposable
         }
         catch(Exception e) { failure ??= e; }
         if(failure != null) throw failure;
-    }, clearError: true);
+    }, operationName:action.ToString().ToLowerInvariant(), clearError: true);
     public static string FriendlyError(Exception e) => e switch
     {
         UnauthorizedAccessException => "USB-Zugriff verweigert. Jabra-Zugriffsregel installieren und Dongle neu einstecken.",

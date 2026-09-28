@@ -82,6 +82,23 @@ public class SessionTests
         b.OperationCompletion.SetResult(); await Task.WhenAll(first,second);
         Assert.Single(b.Calls);
     }
+    [Fact] public async Task QueuedDisconnectEmitsDiagnosticShowingWhatItWaitsFor()
+    {
+        var backend=new FakeBackend();
+        var diagnostics=new List<string>();
+        var session=new DeviceSession(backend,diagnostics.Add);
+        backend.EmitDevices(new DeviceInfo("a","Link",true));
+        session.Select("a");
+        backend.ReadCompletion=new();
+
+        var refresh=session.RefreshAsync();
+        await backend.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var disconnect=session.RunAsync("p",DeviceAction.Disconnect);
+
+        Assert.Contains(diagnostics,message=>message.Contains("operation=disconnect",StringComparison.Ordinal) && message.Contains("waiting-for-dongle-lock",StringComparison.Ordinal));
+        backend.ReadCompletion.SetResult();
+        await Task.WhenAll(refresh,disconnect);
+    }
     [Fact] public async Task SelectedDongleReceivesAction()
     {
         var (b,s)=Setup(); s.Select("b"); await s.RefreshAsync();

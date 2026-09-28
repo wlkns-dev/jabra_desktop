@@ -1,15 +1,19 @@
+using System.Diagnostics;
+
 namespace JabraDesktop.Jabra;
 
 /// <summary>Report slow SDK work without pretending a local timeout cancelled native work.</summary>
 public static class SdkLifetime
 {
-    public static async Task AwaitCompletion(Task task,TimeSpan timeout,Action onTimeout)
+    public static async Task AwaitCompletion(Task task,TimeSpan timeout,Action onTimeout,string operation)
     {
         try { await task.WaitAsync(timeout); }
         catch(TimeoutException) when(!task.IsCompleted)
         {
+            Trace.WriteLine($"{DateTimeOffset.Now:O} op={Activity.Current?.TraceId.ToString()[..8] ?? "none"} event=sdk-timeout operation={operation}");
             onTimeout();
             await task; // Caller retains its device lease until the native task really settles.
+            Trace.WriteLine($"{DateTimeOffset.Now:O} op={Activity.Current?.TraceId.ToString()[..8] ?? "none"} event=sdk-completed-after-timeout operation={operation}");
         }
     }
 }

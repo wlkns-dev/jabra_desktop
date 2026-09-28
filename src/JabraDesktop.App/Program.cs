@@ -7,6 +7,7 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        AppDiagnostics.Initialize();
         StartHidden = args.Contains("--autostart", StringComparer.Ordinal);
         var avaloniaArgs = args.Where(arg => !string.Equals(arg, "--autostart", StringComparison.Ordinal)).ToArray();
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(avaloniaArgs);
