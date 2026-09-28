@@ -51,6 +51,6 @@ unplug/unpair verification; this gap is retained here rather than claimed passed
 
 ## Delivery
 
-Artifacts are local to the feature worktree. No remote release or merge was
-performed as part of this implementation. Package hashes are stored next to the
-packages in `packaging/SHA256SUMS-0.5.0`.
+This report records the pre-release implementation validation. The release
+description is in `docs/releases/v0.5.0.md`. Package hashes are stored next to
+the packages in `packaging/SHA256SUMS-0.5.0`.
