@@ -8,6 +8,7 @@ public sealed class DeviceListItemViewModel : ObservableObject
     readonly LocalizationService texts;
     public DeviceInfo Device { get; private set; }
     public string Name => Device.Name;
+    public string StatusSummary => Device.CanPair ? texts[UiText.BluetoothDongleSubtitle] : texts[UiText.UsbDeviceSubtitle];
     public string RoleLabel => texts[Device.Role switch
     {
         DeviceRole.Dongle => UiText.DeviceRoleDongle,

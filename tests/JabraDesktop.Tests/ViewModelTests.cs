@@ -3,6 +3,49 @@ using JabraDesktop.App.ViewModels;
 namespace JabraDesktop.Tests;
 public class ViewModelTests
 {
+    [Fact] public async Task DongleTreeContainsOnlyItsOwnPeers()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true),new DeviceInfo("b","Link 380",true));
+        backend.PeersByDongle["a"]=[new("pa","Speaker",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("pb","Headset",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        Assert.Equal("pa",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="a").Peers).Peer.Id);
+        Assert.Equal("pb",Assert.Single(vm.Dongles.Single(x=>x.Device.Device.Id=="b").Peers).Peer.Id);
+    }
+    [Fact] public async Task SelectingPeerSelectsItsParentDongle()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        vm.Dongles[0].Peers[0].Select();
+        Assert.Equal("peer",vm.SelectedPeer?.Peer.Id);
+        Assert.Equal("dongle",vm.SelectedDevice?.Device.Id);
+        Assert.Equal("dongle",session.SelectedId);
+    }
+    [Fact] public async Task EndpointHidesPairingSearchAndOverview()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Connected)];
+        await session.RefreshAllAsync();
+        vm.Dongles[0].Peers[0].Select();
+        Assert.False(vm.ShowSearch);
+        Assert.False(vm.ShowDeviceOverview);
+        Assert.False(vm.CanScan);
+    }
+    [Fact] public async Task DisconnectedEndpointOffersConnect()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(new DeviceInfo("dongle","Link",true));
+        backend.PeersByDongle["dongle"]=[new("peer","Speaker",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        var row=Assert.Single(vm.Dongles[0].Peers);
+        Assert.Equal(vm.Texts[JabraDesktop.App.UiText.Connect],row.ActionLabel);
+        await row.ActionCommand.ExecuteAsync(null);
+        Assert.Contains(("dongle","peer",DeviceAction.Connect),backend.Calls);
+    }
     [Fact] public void CapableDongleEnablesSearch()
     {
         var b=new FakeBackend(); var s=new DeviceSession(b); var vm=new MainViewModel(s,a=>a());
