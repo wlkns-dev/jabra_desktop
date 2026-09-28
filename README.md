@@ -79,6 +79,20 @@ curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.4.1/ja
 sudo pacman -U ./jabra-desktop-0.4.1-1-x86_64.pkg.tar.zst
 ```
 
+## Ubuntu-Paket
+
+Für Ubuntu 22.04, 24.04 und 26.04 auf amd64 kannst du das `.deb` aus dem
+[GitHub-Release](https://github.com/wlkns-dev/jabra_desktop/releases) laden
+und mit APT installieren:
+
+```bash
+sudo apt install ./jabra-desktop_0.4.1_amd64.deb
+```
+
+Aus einem Quellcheckout lässt sich das Paket mit `./scripts/package-deb.sh`
+erstellen. Nach der Installation der USB-Regel den Dongle einmal abziehen und
+wieder einstecken, damit die Geräteberechtigung greift.
+
 Softwarestände verwenden annotierte Git-Tags wie `v0.4.1`. Die Version in
 `Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
 für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater

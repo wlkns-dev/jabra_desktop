@@ -6,6 +6,7 @@
 artifacts/
 .superpowers/
 packaging/*.pkg.tar.*
+packaging/*.deb
 packaging/src/
 packaging/pkg/
 packaging/*.log
