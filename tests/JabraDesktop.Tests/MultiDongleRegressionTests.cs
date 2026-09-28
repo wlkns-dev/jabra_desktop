@@ -6,6 +6,48 @@ namespace JabraDesktop.Tests;
 
 public class MultiDongleRegressionTests
 {
+    [Fact] public void TopLevelTelemetryUpdatesWithoutShowingDongleBattery()
+    {
+        var texts=new LocalizationService(UiLanguage.English);
+        var device=new DeviceInfo("dongle","Link",true,Role:DeviceRole.Dongle,
+            Properties:new(false,null,true,"1.0.0"));
+        var row=new DeviceListItemViewModel(device,texts);
+        Assert.Equal("1.0.0",row.TelemetrySummary);
+        var changes=new List<string?>(); row.PropertyChanged+=(_,e)=>changes.Add(e.PropertyName);
+        row.Update(device with { Properties=new(false,null,true,"2.0.0") });
+        Assert.Equal("2.0.0",row.TelemetrySummary);
+        Assert.Contains(nameof(DeviceListItemViewModel.TelemetrySummary),changes);
+        var headset=new DeviceListItemViewModel(new("headset","Headset",false,
+            Properties:new(true,75,true,"3.0.0")),texts);
+        Assert.Equal("75 % · 3.0.0",headset.TelemetrySummary);
+    }
+    [Fact] public async Task SavedDeviceSelectionSurvivesPeriodicRefresh()
+    {
+        var (_,session,vm)=await Setup();
+        vm.Peers.Single().Select();
+        Assert.NotNull(vm.SelectedPeer);
+        await session.RefreshAllAsync();
+        Assert.Same(vm.Dongles[0].Peers[0],vm.SelectedPeer);
+        Assert.True(vm.IsEndpointSelected);
+    }
+    [Fact] public async Task SuccessfulExplicitRetryClearsItsFailureBanner()
+    {
+        var (backend,session,vm)=await Setup();
+        backend.NextError=new IOException("USB failure");
+        await session.RunAsync("a","peer",DeviceAction.Disconnect);
+        Assert.True(vm.HasError);
+        backend.NextError=null;
+        await session.RunAsync("a","peer",DeviceAction.Disconnect);
+        Assert.False(vm.HasError);
+    }
+    [Fact] public async Task DongleErrorDetailUsesSelectedLanguage()
+    {
+        var (backend,session,vm)=await Setup();
+        backend.PeerErrors["a"]=new TimeoutException();
+        await session.RefreshAllAsync();
+        vm.Texts.SetLanguage(UiLanguage.English);
+        Assert.Contains(vm.Texts[UiText.DeviceTimeout],vm.Dongles[0].ErrorText);
+    }
     static async Task<(FakeBackend Backend, DeviceSession Session, MainViewModel Vm)> Setup()
     {
         var backend=new FakeBackend();

@@ -31,6 +31,7 @@
      <StackPanel Spacing="3">
       <TextBlock Text="{Binding Device.Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
       <TextBlock Text="{Binding Device.RoleLabel}" Classes="muted" FontSize="11" />
+      <TextBlock Text="{Binding Device.TelemetrySummary}" IsVisible="{Binding Device.HasTelemetry}" Classes="muted" FontSize="11" />
      </StackPanel>
     </Button>
     <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
@@ -63,7 +64,7 @@
       <ItemsControl ItemsSource="{Binding StandaloneDevices}">
        <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:DeviceListItemViewModel">
         <Button Command="{Binding SelectCommand}" HorizontalContentAlignment="Left" Background="Transparent" Padding="10,8">
-         <StackPanel Spacing="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding RoleLabel}" Classes="muted" FontSize="11" /><TextBlock Text="{Binding IdentifierText}" IsVisible="{Binding HasIdentifier}" Classes="muted" FontSize="10" /></StackPanel>
+         <StackPanel Spacing="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding RoleLabel}" Classes="muted" FontSize="11" /><TextBlock Text="{Binding IdentifierText}" IsVisible="{Binding HasIdentifier}" Classes="muted" FontSize="10" /><TextBlock Text="{Binding TelemetrySummary}" IsVisible="{Binding HasTelemetry}" Classes="muted" FontSize="11" /></StackPanel>
         </Button>
        </DataTemplate></ItemsControl.ItemTemplate>
       </ItemsControl>

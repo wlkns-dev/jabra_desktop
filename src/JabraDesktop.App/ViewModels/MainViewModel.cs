@@ -41,6 +41,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         get=>selectedPeer;
         set
         {
+            if(value is not null)
+                value=Dongles.FirstOrDefault(d=>d.Device.Device.Id==value.DongleId)?.Peers.FirstOrDefault(p=>p.Peer.Id==value.Peer.Id);
             if(!SetProperty(ref selectedPeer,value)) return;
             if(value is not null)
             {

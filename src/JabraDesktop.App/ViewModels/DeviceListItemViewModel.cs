@@ -11,6 +11,11 @@ public sealed class DeviceListItemViewModel : ObservableObject
     public IRelayCommand SelectCommand { get; }
     public DeviceInfo Device { get; private set; }
     public string Name => Device.Name;
+    public string TelemetrySummary => string.Join(" · ",new[] {
+        Device.Properties?.BatteryApplicable==true && Device.Properties.BatteryPercent is {} n ? $"{n} %" : null,
+        Device.Properties?.Firmware ?? Device.Firmware
+    }.Where(value=>value is not null));
+    public bool HasTelemetry => TelemetrySummary.Length>0;
     public string StatusSummary => Device.CanPair ? texts[UiText.BluetoothDongleSubtitle] : texts[UiText.UsbDeviceSubtitle];
     public string RoleLabel => texts[Device.Role switch
     {
@@ -38,6 +43,8 @@ public sealed class DeviceListItemViewModel : ObservableObject
         if (old == device) return;
         Device = device;
         OnPropertyChanged(nameof(Device));
+        OnPropertyChanged(nameof(TelemetrySummary));
+        OnPropertyChanged(nameof(HasTelemetry));
         if (old.Name != device.Name) OnPropertyChanged(nameof(Name));
         if (old.Role != device.Role) OnPropertyChanged(nameof(RoleLabel));
         if (old.VendorId != device.VendorId || old.ProductId != device.ProductId)

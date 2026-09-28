@@ -328,7 +328,6 @@ public sealed class DeviceSession : IAsyncDisposable
             lock(gate) if(Attached(dongleId,attachment))
             {
                 peerSnapshots[dongleId]=peerSnapshots[dongleId] with { Error=FriendlyError(e) };
-                if(selected==dongleId) error=FriendlyError(e);
             }
         }
         finally

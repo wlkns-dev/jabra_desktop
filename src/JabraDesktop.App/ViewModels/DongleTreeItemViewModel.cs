@@ -12,7 +12,7 @@ public sealed class DongleTreeItemViewModel : ObservableObject
     public ObservableCollection<PeerRow> Peers { get; } = [];
     public string? Error { get; private set; }
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
-    public string? ErrorText => HasError ? $"{texts[UiText.DongleRefreshError]} {Error}" : null;
+    public string? ErrorText => HasError ? $"{texts[UiText.DongleRefreshError]} {texts.TranslateSessionError(Error)}" : null;
     public DongleTreeItemViewModel(DeviceListItemViewModel device,LocalizationService texts) { Device = device; this.texts=texts; }
     public void Update(DonglePeerSnapshot snapshot, Func<PeerInfo, PeerRow> createRow)
     {

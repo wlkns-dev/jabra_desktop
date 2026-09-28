@@ -10,6 +10,20 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-28-multi-dongle-device-hierarchy-design.md`
 
+## Delivery status — 2026-09-28
+
+The five implementation tasks are delivered on `feat/multi-dongle-device-hierarchy-0.5.0`.
+Implementation commits: `21645ce`, `b628556`, `29955e2`, `7580198`, `e64ae50`.
+The final review identified four issues, each reproduced with a regression test
+and fixed; the full suite passes 134 tests. Arch and Debian packages are prepared
+locally. Remote publishing remains outside this delivery.
+
+Live verification confirmed firmware for both dongles and firmware/battery for
+both connected endpoints; disconnect/reconnect was tested on both combinations.
+Real unpair and physical unplug were deliberately omitted to preserve the saved
+pairings; those remain hands-on validation items. See
+`docs/hardware-validation.md` and `docs/verification-0.5.0.md`.
+
 ## Global Constraints
 
 - Show each paired headset or speaker beneath every dongle with which it is paired, including while disconnected.
