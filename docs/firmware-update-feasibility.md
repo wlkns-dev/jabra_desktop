@@ -7,7 +7,7 @@ pairing, but Jabra explicitly identifies **JabraCLI as the current firmware
 update route** for third-party software. Its Linux AppImage is beta software;
 Jabra reports testing it on Ubuntu 26.04 x64. Our CachyOS installation and
 the exact Link 370, Link 380, Evolve 75 SE, and Speak 710 variants have not
-yet been validated with JabraCLI. Jabra lists the Evolve and Speak families
+yet been fully validated with JabraCLI. Jabra lists the Evolve and Speak families
 generally, and limits JabraCLI to USB-connected devices, including headsets
 connected through a dongle. Model-level support and available firmware must
 be queried from the tool rather than inferred from this family list.
@@ -30,8 +30,27 @@ be queried from the tool rather than inferred from this family list.
 
 The `list` and `download` commands need access to Jabra's firmware catalog;
 the update itself uses the previously downloaded local file. JabraCLI reports
-anonymized usage telemetry. It is not currently installed on this machine, so
-no model-level CLI query or firmware write has been performed.
+anonymized usage telemetry.
+
+## Read-only check on this machine
+
+The official JabraCLI 1.6.48.0 AppImage was downloaded to `/tmp`. The direct
+AppImage launch failed because this CachyOS system lacks `libfuse.so.2`;
+extracting the AppImage and running its `AppRun` worked without installing it.
+The download size and MD5 matched the values served by Jabra.
+
+With our app stopped, `device list --output-format json` found a Link 370
+(PID 9310 / `0x245E`, firmware 1.87.0) and an Evolve 75 connected through it
+(PID 9318 / `0x2466`, firmware 2.38.0). `firmware list` returned versions
+1.87.0, 1.82.0, and 1.50.0 for the Link 370, and 2.38.0, 2.32.0, and 2.10.0
+for the Evolve 75. Both installed versions were the newest returned for these
+product IDs. No firmware file was downloaded or written. Link 380 and Speak 710
+were not attached during this check and remain unverified with JabraCLI.
+
+The same `device list` call stalled for over two minutes while our app and its
+Jabra connector were running, but completed quickly when the app was stopped.
+This demonstrates that a future integration must coordinate exclusive device
+access instead of launching the CLI concurrently with our SDK session.
 
 ## Possible integration
 

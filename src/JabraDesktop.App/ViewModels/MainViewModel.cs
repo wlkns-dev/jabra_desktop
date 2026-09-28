@@ -197,7 +197,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             group.Update(peerSnapshot,p=>new PeerRow(p,false,this,info.Id));
         }
         var nestedIds=snapshots.SelectMany(s=>s.Peers).Select(p=>p.SourceDeviceId).OfType<string>().ToHashSet();
-        var standalone=devices.Where(d=>!d.CanPair && !nestedIds.Contains(d.Id)).ToArray();
+        var standalone=devices.Where(d=>!d.CanPair && d.ParentDongleId is null && !nestedIds.Contains(d.Id)).ToArray();
         for(var i=StandaloneDevices.Count-1;i>=0;i--) if(!standalone.Any(d=>d.Id==StandaloneDevices[i].Device.Id)) StandaloneDevices.RemoveAt(i);
         foreach(var info in standalone)
         {

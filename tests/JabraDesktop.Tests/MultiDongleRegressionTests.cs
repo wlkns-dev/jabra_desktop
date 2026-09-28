@@ -76,6 +76,19 @@ public class MultiDongleRegressionTests
         await session.RefreshAllAsync();
         Assert.Single(vm.Dongles[0].Peers); Assert.Empty(vm.StandaloneDevices);
     }
+    [Fact] public void DongleChildIsNotShownAsStandaloneWhilePairingListLoads()
+    {
+        var backend=new FakeBackend();
+        var session=new DeviceSession(backend);
+        var vm=new MainViewModel(session,action=>action());
+        backend.EmitDevices(
+            new DeviceInfo("link","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child","Evolve 75",false,Role:DeviceRole.Headset,ParentDongleId:"link"),
+            new DeviceInfo("wired","USB Headset",false,Role:DeviceRole.Headset));
+        Assert.Single(vm.Dongles);
+        Assert.Empty(vm.Dongles[0].Peers);
+        Assert.Equal("wired",Assert.Single(vm.StandaloneDevices).Device.Id);
+    }
     [Fact] public async Task SelectedConnectedEndpointUpdatesInPlaceAndRemainsSelected()
     {
         var (backend,session,vm)=await Setup();

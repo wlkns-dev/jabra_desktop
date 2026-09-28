@@ -147,7 +147,20 @@ public sealed class JabraBackend : IDeviceBackend
     {
         publisher.Publish(() =>
         {
-            lock(gate) return disposed ? [] : entries.Values.Select(e=>e.Info).ToArray();
+            lock(gate)
+            {
+                if(disposed) return [];
+                var current=entries.Values.ToArray();
+                return current.Select(entry =>
+                {
+                    var parent=entry.Dongle is null
+                        ? current.FirstOrDefault(candidate=>!ReferenceEquals(candidate,entry)
+                            && (candidate.Dongle is not null || DeviceMapper.Role(candidate.Source.Type)==DeviceRole.Dongle)
+                            && IsChildOf(entry,candidate))
+                        : null;
+                    return entry.Info with { ParentDongleId=parent?.Id };
+                }).ToArray();
+            }
         }, snapshot => { if(!disposed) DevicesChanged?.Invoke(snapshot); });
     }
     DeviceEntry Find(string id)
