@@ -2,6 +2,68 @@ using JabraDesktop.Core;
 namespace JabraDesktop.Tests;
 public class SessionTests
 {
+    [Fact] public async Task RefreshAllRetainsDistinctPeerGroupsForTwoDongles()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link 370",true),new("b","Link 380",true));
+        backend.PeersByDongle["a"]=[new("p1","Speaker",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("p2","Headset",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        Assert.Equal(new[]{"p1"},session.PeerSnapshots.Single(x=>x.DongleId=="a").Peers.Select(x=>x.Id));
+        Assert.Equal(new[]{"p2"},session.PeerSnapshots.Single(x=>x.DongleId=="b").Peers.Select(x=>x.Id));
+    }
+    [Fact] public async Task SamePeerOnTwoDonglesRemainsDistinct()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        backend.PeersByDongle["a"]=[new("same","Device A",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("same","Device B",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        Assert.Equal(2,session.PeerSnapshots.Count);
+        Assert.All(session.PeerSnapshots,x=>Assert.Equal("same",Assert.Single(x.Peers).Id));
+    }
+    [Fact] public async Task ConcurrentRefreshAllCoalescesPerDongle()
+    {
+        var backend=new FakeBackend { ReadCompletion=new() }; var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        var first=session.RefreshAllAsync();
+        await backend.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var second=session.RefreshAllAsync();
+        backend.ReadCompletion.SetResult();
+        await Task.WhenAll(first,second);
+        Assert.Equal(1,backend.PeerReads.Count(x=>x=="a"));
+        Assert.Equal(1,backend.PeerReads.Count(x=>x=="b"));
+    }
+    [Fact] public async Task FailedDongleRefreshKeepsLastSnapshotAndOtherDongleUsable()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        backend.PeersByDongle["a"]=[new("pa","Speaker",LinkState.Connected)];
+        backend.PeersByDongle["b"]=[new("pb","Headset",LinkState.Connected)];
+        await session.RefreshAllAsync();
+        backend.PeerErrors["a"]=new IOException("failure");
+        backend.PeersByDongle["b"]=[new("pb2","Headset 2",LinkState.Disconnected)];
+        await session.RefreshAllAsync();
+        Assert.Equal("pa",Assert.Single(session.PeerSnapshots.Single(x=>x.DongleId=="a").Peers).Id);
+        Assert.NotNull(session.PeerSnapshots.Single(x=>x.DongleId=="a").Error);
+        Assert.Equal("pb2",Assert.Single(session.PeerSnapshots.Single(x=>x.DongleId=="b").Peers).Id);
+    }
+    [Fact] public async Task RemovedDongleDropsOnlyItsSnapshot()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        await session.RefreshAllAsync();
+        backend.EmitDevices(new DeviceInfo("b","Link",true));
+        Assert.Single(session.PeerSnapshots);
+        Assert.Equal("b",session.PeerSnapshots[0].DongleId);
+    }
+    [Fact] public async Task PeerActionTargetsExplicitParentDongle()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend);
+        backend.EmitDevices(new("a","Link",true),new("b","Link",true));
+        await session.RunAsync("b","peer-b",DeviceAction.Disconnect);
+        Assert.Contains(("b","peer-b",DeviceAction.Disconnect),backend.Calls);
+    }
     static (FakeBackend b, DeviceSession s) Setup()
     {
         var b = new FakeBackend { Peers = [new("p", "Evolve", LinkState.Disconnected)] };

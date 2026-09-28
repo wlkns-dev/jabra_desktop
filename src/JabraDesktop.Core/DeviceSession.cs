@@ -11,6 +11,8 @@ public sealed class DeviceSession : IAsyncDisposable
     readonly HashSet<string> busy = [];
     readonly HashSet<string> foregroundBusy = [];
     readonly Dictionary<string,SemaphoreSlim> operationLocks = [];
+    readonly Dictionary<string,DonglePeerSnapshot> peerSnapshots = [];
+    readonly Dictionary<string,Task> refreshes = [];
     IReadOnlyList<DeviceInfo> devices = [];
     IReadOnlyList<PeerInfo> peers = [], results = [];
     string? selected, error;
@@ -28,6 +30,7 @@ public sealed class DeviceSession : IAsyncDisposable
     public IReadOnlyList<DeviceInfo> Devices { get { lock(gate) return devices; } }
     public IReadOnlyList<PeerInfo> Peers { get { lock(gate) return peers; } }
     public IReadOnlyList<PeerInfo> Results { get { lock(gate) return results; } }
+    public IReadOnlyList<DonglePeerSnapshot> PeerSnapshots { get { lock(gate) return peerSnapshots.Values.ToArray(); } }
     public string? SelectedId { get { lock(gate) return selected; } }
     public bool IsBusy { get { lock(gate) return starting || selected is {} id && foregroundBusy.Contains(id); } }
     public string? Error { get { lock(gate) return error; } }
@@ -40,6 +43,9 @@ public sealed class DeviceSession : IAsyncDisposable
             var next=update.ToArray();
             if(devices.SequenceEqual(next)) return;
             devices=next;
+            var dongleIds=devices.Where(d=>d.CanPair).Select(d=>d.Id).ToHashSet();
+            foreach(var id in peerSnapshots.Keys.Where(id=>!dongleIds.Contains(id)).ToArray()) peerSnapshots.Remove(id);
+            foreach(var id in dongleIds) peerSnapshots.TryAdd(id,new(id,[]));
             if(selected != null && !devices.Any(d => d.Id == selected)) SelectLocked(null);
         }
         Changed?.Invoke();
@@ -78,6 +84,55 @@ public sealed class DeviceSession : IAsyncDisposable
             }
             if(changed) Changed?.Invoke();
         }, operationName:"refresh", showActivity:false);
+    }
+    public Task RefreshAsync(string dongleId,CancellationToken token = default) => RefreshDongleAsync(dongleId,token);
+    public Task RefreshAllAsync(CancellationToken token = default)
+    {
+        string[] ids;
+        lock(gate) ids=devices.Where(d=>d.CanPair).Select(d=>d.Id).ToArray();
+        return Task.WhenAll(ids.Select(id=>RefreshDongleAsync(id,token)));
+    }
+    Task RefreshDongleAsync(string id,CancellationToken token)
+    {
+        TaskCompletionSource completion;
+        lock(gate)
+        {
+            if(disposed || !devices.Any(d=>d.Id==id && d.CanPair)) return Task.CompletedTask;
+            if(refreshes.TryGetValue(id,out var existing)) return existing;
+            completion=new(TaskCreationOptions.RunContinuationsAsynchronously);
+            refreshes[id]=completion.Task;
+        }
+        _=RefreshDongleCoreAsync(id,token,completion);
+        return completion.Task;
+    }
+    async Task RefreshDongleCoreAsync(string id,CancellationToken token,TaskCompletionSource completion)
+    {
+        try
+        {
+            var update=await backend.GetPeersAsync(id,token);
+            lock(gate)
+            {
+                if(!disposed && devices.Any(d=>d.Id==id && d.CanPair))
+                {
+                    peerSnapshots[id]=new(id,update.ToArray());
+                    if(selected==id) peers=update.ToArray();
+                }
+            }
+        }
+        catch(Exception e)
+        {
+            lock(gate)
+            {
+                if(!disposed && peerSnapshots.TryGetValue(id,out var last))
+                    peerSnapshots[id]=last with { Error=FriendlyError(e) };
+            }
+        }
+        finally
+        {
+            lock(gate) refreshes.Remove(id);
+            completion.TrySetResult();
+            Changed?.Invoke();
+        }
     }
     public Task RefreshDevicePropertiesAsync(string deviceId,CancellationToken token = default)
     {
@@ -197,6 +252,22 @@ public sealed class DeviceSession : IAsyncDisposable
         catch(Exception e) { failure ??= e; }
         if(failure != null) throw failure;
     }, operationName:action.ToString().ToLowerInvariant(), clearError: true);
+    public async Task RunAsync(string dongleId,string peerId,DeviceAction action,CancellationToken token = default)
+    {
+        SemaphoreSlim operationLock;
+        lock(gate)
+        {
+            if(disposed || !devices.Any(d=>d.Id==dongleId && d.CanPair)) return;
+            if(!operationLocks.TryGetValue(dongleId,out operationLock!)) operationLocks[dongleId]=operationLock=new(1,1);
+        }
+        await operationLock.WaitAsync(token);
+        try
+        {
+            await backend.ExecuteAsync(dongleId,peerId,action,token);
+            await RefreshDongleAsync(dongleId,CancellationToken.None);
+        }
+        finally { operationLock.Release(); }
+    }
     public static string FriendlyError(Exception e) => e switch
     {
         UnauthorizedAccessException => "USB-Zugriff verweigert. Jabra-Zugriffsregel installieren und Dongle neu einstecken.",

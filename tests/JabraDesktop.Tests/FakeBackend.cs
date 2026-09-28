@@ -8,6 +8,9 @@ public sealed class FakeBackend : IDeviceBackend
     public event Action<string>? Faulted;
     public Channel<PeerInfo> Scan { get; } = Channel.CreateUnbounded<PeerInfo>();
     public IReadOnlyList<PeerInfo> Peers { get; set; } = [];
+    public Dictionary<string, IReadOnlyList<PeerInfo>> PeersByDongle { get; } = [];
+    public Dictionary<string, Exception> PeerErrors { get; } = [];
+    public List<string> PeerReads { get; } = [];
     public Exception? NextError { get; set; }
     public TaskCompletionSource? OperationCompletion { get; set; }
     public TaskCompletionSource? ReadCompletion { get; set; }
@@ -20,7 +23,7 @@ public sealed class FakeBackend : IDeviceBackend
     public void Fail(string text) => Faulted?.Invoke(text);
     public Task StartAsync(CancellationToken token) => NextError is {} e ? Task.FromException(e) : Task.CompletedTask;
     public async Task<IReadOnlyList<PeerInfo>> GetPeersAsync(string id, CancellationToken token)
-    { ReadStarted.TrySetResult(); if (ReadCompletion is {} pending) await pending.Task; return Peers; }
+    { PeerReads.Add(id); ReadStarted.TrySetResult(); if (ReadCompletion is {} pending) await pending.Task; if(PeerErrors.TryGetValue(id,out var error)) throw error; return PeersByDongle.GetValueOrDefault(id, Peers); }
     public async Task RefreshDevicePropertiesAsync(string id,CancellationToken token)
     {
         PropertyRefreshCalls.Add(id);
