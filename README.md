@@ -72,12 +72,12 @@ sudo pacman -U "$package_file"
 ```
 
 Fertige Arch-Pakete werden als Assets in den [GitHub Releases](https://github.com/wlkns-dev/jabra_desktop/releases)
-bereitgestellt. Für Release `v0.5.1` lädst du das Paket herunter und installierst
+bereitgestellt. Für Release `v0.5.2` lädst du das Paket herunter und installierst
 es zum Beispiel so:
 
 ```bash
-curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.5.1/jabra-desktop-0.5.1-1-x86_64.pkg.tar.zst
-sudo pacman -U ./jabra-desktop-0.5.1-1-x86_64.pkg.tar.zst
+curl -fLO https://github.com/wlkns-dev/jabra_desktop/releases/download/v0.5.2/jabra-desktop-0.5.2-1-x86_64.pkg.tar.zst
+sudo pacman -U ./jabra-desktop-0.5.2-1-x86_64.pkg.tar.zst
 ```
 
 ## Ubuntu-Paket
@@ -87,14 +87,14 @@ Für Ubuntu 22.04, 24.04 und 26.04 auf amd64 kannst du das `.deb` aus dem
 und mit APT installieren:
 
 ```bash
-sudo apt install ./jabra-desktop_0.5.1_amd64.deb
+sudo apt install ./jabra-desktop_0.5.2_amd64.deb
 ```
 
 Aus einem Quellcheckout lässt sich das Paket mit `./scripts/package-deb.sh`
 erstellen. Nach der Installation der USB-Regel den Dongle einmal abziehen und
 wieder einstecken, damit die Geräteberechtigung greift.
 
-Softwarestände verwenden annotierte Git-Tags wie `v0.5.1`. Die Version in
+Softwarestände verwenden annotierte Git-Tags wie `v0.5.2`. Die Version in
 `Directory.Build.props`, `pkgver` im PKGBUILD, Paket und Release bleibt synchron;
 für eine reine Paketkorrektur wird `pkgrel` erhöht. Einen eingebauten Updater
 gibt es nicht. AUR und ein automatisiertes Pacman-Repository sind noch nicht

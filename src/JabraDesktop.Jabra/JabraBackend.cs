@@ -114,7 +114,11 @@ public sealed class JabraBackend : IDeviceBackend
             BatteryPercent: entry.Properties.BatteryPercent,
             FirmwareApplicable: capabilities.Any(c => c.ValueKind == DevicePropertyValueKind.Firmware),
             Firmware: entry.Properties.Firmware,
-            CanRefresh: propertiesInitialized && capabilities.Count > 0);
+            CanRefresh: propertiesInitialized && capabilities.Count > 0,
+            PartNumber: entry.Properties.PartNumber,
+            AudioName: entry.Properties.AudioName,
+            MobilePhoneKnown: entry.Properties.MobilePhoneKnown,
+            MobilePhone: entry.Properties.MobilePhone);
         entry.CanRefreshProperties = entry.Properties.CanRefresh;
     }
     void SlowOperation(string operation)

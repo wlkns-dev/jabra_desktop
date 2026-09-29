@@ -17,4 +17,11 @@ internal static class PropertyValueMapper
         var percent = value.AsInteger();
         return percent is >= 0 and <= 100 ? percent : null;
     }
+
+    public static string? ProductText(PropertyValue value)
+    {
+        if(value is not StringPropertyValue) return null;
+        var text=value.AsString().Trim();
+        return text.Length==0 ? null : text;
+    }
 }

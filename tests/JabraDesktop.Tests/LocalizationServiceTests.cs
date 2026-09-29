@@ -21,6 +21,16 @@ public sealed class LocalizationServiceTests
         Assert.Contains("dongle",UiTextCatalog.Get(UiLanguage.English,UiText.DongleRefreshError),StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dongle",UiTextCatalog.Get(UiLanguage.German,UiText.DongleRefreshError),StringComparison.OrdinalIgnoreCase);
     }
+    [Fact]
+    public void ProductInformationLabelsExistInBothLanguages()
+    {
+        Assert.Equal("TEILENUMMER",UiTextCatalog.Get(UiLanguage.German,UiText.PartNumber));
+        Assert.Equal("PART NUMBER",UiTextCatalog.Get(UiLanguage.English,UiText.PartNumber));
+        Assert.Equal("AUDIOGERÄTENAME",UiTextCatalog.Get(UiLanguage.German,UiText.AudioName));
+        Assert.Equal("AUDIO DEVICE NAME",UiTextCatalog.Get(UiLanguage.English,UiText.AudioName));
+        Assert.Equal("VERBUNDENES TELEFON",UiTextCatalog.Get(UiLanguage.German,UiText.MobilePhone));
+        Assert.Equal("CONNECTED PHONE",UiTextCatalog.Get(UiLanguage.English,UiText.MobilePhone));
+    }
     [Theory]
     [InlineData(UiLanguage.German, UiText.RefreshDeviceStatus, "Gerätestatus aktualisieren")]
     [InlineData(UiLanguage.German, UiText.RefreshingDeviceStatus, "Status wird aktualisiert …")]

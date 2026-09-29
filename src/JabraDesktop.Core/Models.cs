@@ -3,7 +3,9 @@ public enum LinkState { Unknown, Disconnected, Connected }
 public enum DeviceAction { Pair, Connect, Disconnect, Unpair }
 public enum DeviceRole { Unknown, Headset, Dongle, Other }
 public record DeviceProperties(bool BatteryApplicable = false, int? BatteryPercent = null,
-    bool FirmwareApplicable = false, string? Firmware = null, bool CanRefresh = false);
+    bool FirmwareApplicable = false, string? Firmware = null, bool CanRefresh = false,
+    string? PartNumber = null, string? AudioName = null,
+    bool MobilePhoneKnown = false, string? MobilePhone = null);
 public record DeviceInfo(string Id, string Name, bool CanPair, int? BatteryPercent = null, string? Firmware = null,
     DeviceRole Role = DeviceRole.Unknown, int? VendorId = null, int? ProductId = null, bool CanRefreshProperties = false,
     DeviceProperties? Properties = null, string? ParentDongleId = null);
