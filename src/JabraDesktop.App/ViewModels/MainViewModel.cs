@@ -67,7 +67,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool IsScanning { get=>isScanning; private set { SetProperty(ref isScanning,value); OnPropertyChanged(nameof(ShowSearch)); } }
     public bool ShowSearch => HasDongle && (hasSearched || IsScanning || Results.Count>0);
     public bool ShowEndpointStatus=>HasDevice && !HasDongle;
-    public bool HasProperties=>HasDevice && (ShowBattery || ShowFirmware);
+    public bool HasProperties=>HasDevice && (ShowBattery || ShowFirmware || ShowPartNumber || ShowAudioName || ShowMobilePhone);
     public bool ShowDeviceOverview => HasDongle;
     public string SearchSummary => IsScanning ? texts[UiText.SearchingPairingMode]
         : Results.Count == 0 ? texts[UiText.SearchNoDevices]
@@ -88,6 +88,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string FirmwareText => (SelectedPeer is not null ? SelectedProperties?.Firmware : SelectedProperties?.Firmware ?? selectedDevice?.Device.Firmware) ?? texts[UiText.FirmwareUnavailable];
     public bool ShowBattery => SelectedProperties?.BatteryApplicable ?? (SelectedPeer is null && selectedDevice?.Device.Role is DeviceRole.Headset or DeviceRole.Other);
     public bool ShowFirmware => SelectedProperties?.FirmwareApplicable ?? (HasDevice || IsEndpointSelected);
+    public bool ShowPartNumber => !string.IsNullOrWhiteSpace(SelectedProperties?.PartNumber);
+    public string PartNumberText => SelectedProperties?.PartNumber ?? string.Empty;
+    public bool ShowAudioName => !string.IsNullOrWhiteSpace(SelectedProperties?.AudioName);
+    public string AudioNameText => SelectedProperties?.AudioName ?? string.Empty;
+    public bool ShowMobilePhone => SelectedProperties?.MobilePhoneKnown==true;
+    public string MobilePhoneText => SelectedProperties?.MobilePhone ?? texts[UiText.NoPhoneConnected];
     public string? Error => texts.TranslateSessionError(session.PeerSnapshots.FirstOrDefault(s=>s.DongleId==selectedDevice?.Device.Id)?.Error ?? session.Error);
     public bool HasError => !string.IsNullOrWhiteSpace(Error);
     public IAsyncRelayCommand ScanCommand { get; }
@@ -238,7 +244,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     }
     void NotifyState()
     {
-        foreach(var name in new[]{nameof(CanScan),nameof(CanRefreshProperties),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(IsEndpointSelected),nameof(ShowDeviceOverview),nameof(ShowBattery),nameof(ShowFirmware),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(RefreshPropertiesText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary),nameof(HasStandaloneDevices),nameof(HasProperties),nameof(ShowEndpointStatus)}) OnPropertyChanged(name);
+        foreach(var name in new[]{nameof(CanScan),nameof(CanRefreshProperties),nameof(IsBusy),nameof(HasDevice),nameof(HasDongle),nameof(IsEndpointSelected),nameof(ShowDeviceOverview),nameof(ShowBattery),nameof(ShowFirmware),nameof(ShowPartNumber),nameof(PartNumberText),nameof(ShowAudioName),nameof(AudioNameText),nameof(ShowMobilePhone),nameof(MobilePhoneText),nameof(NoPeers),nameof(DeviceTitle),nameof(DeviceSubtitle),nameof(StatusText),nameof(BatteryText),nameof(FirmwareText),nameof(RefreshPropertiesText),nameof(Error),nameof(HasError),nameof(ShowSearch),nameof(SearchSummary),nameof(HasStandaloneDevices),nameof(HasProperties),nameof(ShowEndpointStatus)}) OnPropertyChanged(name);
         ScanCommand.NotifyCanExecuteChanged(); RefreshCommand.NotifyCanExecuteChanged(); RefreshPropertiesCommand.NotifyCanExecuteChanged();
         foreach(var row in Peers.Concat(Results).Concat(Dongles.SelectMany(d=>d.Peers))) row.NotifyEnabled();
     }

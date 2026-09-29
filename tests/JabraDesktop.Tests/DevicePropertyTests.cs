@@ -40,6 +40,22 @@ public class DevicePropertyTests
     }
 
     [Fact]
+    public void ProductInformationCandidatesFollowDeviceRole()
+    {
+        var dongle=DevicePropertyCapabilities.For(Device(DeviceRole.Dongle,0x0B0E,0x245E));
+        var headset=DevicePropertyCapabilities.For(Device(DeviceRole.Headset,0x0B0E,0x2466));
+        var speaker=DevicePropertyCapabilities.For(Device(DeviceRole.Other,0x0B0E,0x2502));
+
+        Assert.Contains(dongle,c=>c.PropertyName=="audioName");
+        Assert.DoesNotContain(dongle,c=>c.PropertyName is "skuId" or "mobileDevice1");
+        Assert.Contains(headset,c=>c.PropertyName=="skuId");
+        Assert.Contains(headset,c=>c.PropertyName=="mobileDevice1");
+        Assert.DoesNotContain(headset,c=>c.PropertyName=="audioName");
+        Assert.Contains(speaker,c=>c.PropertyName=="skuId");
+        Assert.DoesNotContain(speaker,c=>c.PropertyName is "audioName" or "mobileDevice1");
+    }
+
+    [Fact]
     public void PropertyValuesRetainApplicabilityAndAreUpdatedIndependently()
     {
         var current = new DeviceProperties(BatteryApplicable: true, BatteryPercent: null,
@@ -105,6 +121,39 @@ public class DevicePropertyTests
     {
         Assert.Null(PropertyValueMapper.BatteryPercent(PropertyValue.FromString("75")));
         Assert.Null(PropertyValueMapper.BatteryPercent(PropertyValue.FromDouble(75.0)));
+    }
+
+    [Fact]
+    public void ProductStringsAreTrimmedAndInvalidValuesStayHidden()
+    {
+        var current=new DeviceProperties(Firmware:"2.38.0",BatteryPercent:91);
+        var part=DevicePropertyValueUpdate.Apply(current,
+            new("skuId",DevicePropertyValueKind.PartNumber),PropertyValue.FromString(" 7599-838-109 "));
+        var audio=DevicePropertyValueUpdate.Apply(part,
+            new("audioName",DevicePropertyValueKind.AudioName),PropertyValue.FromString(" Jabra Link 370 "));
+        var invalid=DevicePropertyValueUpdate.Apply(audio,
+            new("skuId",DevicePropertyValueKind.PartNumber),PropertyValue.FromInt32(75));
+
+        Assert.Equal("7599-838-109",part.PartNumber);
+        Assert.Equal("Jabra Link 370",audio.AudioName);
+        Assert.Null(invalid.PartNumber);
+        Assert.Equal("Jabra Link 370",invalid.AudioName);
+        Assert.Equal("2.38.0",invalid.Firmware);
+        Assert.Equal(91,invalid.BatteryPercent);
+    }
+
+    [Fact]
+    public void EmptyPhoneReadMeansNoPhoneWhileFailedReadIsUnknown()
+    {
+        var capability=new DevicePropertyCapability("mobileDevice1",DevicePropertyValueKind.MobilePhone);
+        var empty=DevicePropertyValueUpdate.Apply(new DeviceProperties(),capability,PropertyValue.FromString("  "));
+        var failed=DevicePropertyValueUpdate.Apply(empty,capability,null);
+        var mistyped=DevicePropertyValueUpdate.Apply(empty,capability,PropertyValue.FromInt32(0));
+
+        Assert.True(empty.MobilePhoneKnown);
+        Assert.Null(empty.MobilePhone);
+        Assert.False(failed.MobilePhoneKnown);
+        Assert.False(mistyped.MobilePhoneKnown);
     }
 
     [Fact]

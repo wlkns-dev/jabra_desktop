@@ -14,7 +14,8 @@ public sealed class FakeBackend : IDeviceBackend
     public Exception? NextError { get; set; }
     public TaskCompletionSource? OperationCompletion { get; set; }
     public TaskCompletionSource? ReadCompletion { get; set; }
-    public TaskCompletionSource ReadStarted { get; }=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource ReadStarted { get; set; }=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public bool CaptureReadBeforeWait { get; set; }
     public TaskCompletionSource? PropertyRefreshCompletion { get; set; }
     public List<(string Dongle,string Peer)> PeerPropertyRefreshCalls { get; }=[];
     public Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token) { PeerPropertyRefreshCalls.Add((dongleId,peerId)); return Task.CompletedTask; }
@@ -27,7 +28,9 @@ public sealed class FakeBackend : IDeviceBackend
     public void Fail(string text) => Faulted?.Invoke(text);
     public Task StartAsync(CancellationToken token) => NextError is {} e ? Task.FromException(e) : Task.CompletedTask;
     public async Task<IReadOnlyList<PeerInfo>> GetPeersAsync(string id, CancellationToken token)
-    { PeerReads.Add(id); ReadStarted.TrySetResult(); if (ReadCompletion is {} pending) await pending.Task; if(PeerErrors.TryGetValue(id,out var error)) throw error; return PeersByDongle.GetValueOrDefault(id, Peers); }
+    { PeerReads.Add(id); var captured=CaptureReadBeforeWait ? PeersByDongle.GetValueOrDefault(id,Peers).ToArray() : null;
+      ReadStarted.TrySetResult(); if (ReadCompletion is {} pending) await pending.Task;
+      if(PeerErrors.TryGetValue(id,out var error)) throw error; return captured ?? PeersByDongle.GetValueOrDefault(id, Peers); }
     public async Task RefreshDevicePropertiesAsync(string id,CancellationToken token)
     {
         PropertyRefreshCalls.Add(id);

@@ -120,6 +120,9 @@
       <WrapPanel Orientation="Horizontal">
        <StackPanel Spacing="8" MinWidth="200" Margin="0,0,20,8" IsVisible="{Binding ShowBattery}"><TextBlock Text="{Binding Texts[Battery]}" Classes="eyebrow" /><TextBlock Text="{Binding BatteryText}" Classes="muted" /></StackPanel>
        <StackPanel Spacing="8" MinWidth="200" IsVisible="{Binding ShowFirmware}"><TextBlock Text="{Binding Texts[Firmware]}" Classes="eyebrow" /><TextBlock Text="{Binding FirmwareText}" Classes="muted" /></StackPanel>
+       <StackPanel Spacing="8" MinWidth="200" Margin="0,0,20,8" IsVisible="{Binding ShowPartNumber}"><TextBlock Text="{Binding Texts[PartNumber]}" Classes="eyebrow" /><TextBlock Text="{Binding PartNumberText}" Classes="muted" /></StackPanel>
+       <StackPanel Spacing="8" MinWidth="200" Margin="0,0,20,8" IsVisible="{Binding ShowAudioName}"><TextBlock Text="{Binding Texts[AudioName]}" Classes="eyebrow" /><TextBlock Text="{Binding AudioNameText}" Classes="muted" /></StackPanel>
+       <StackPanel Spacing="8" MinWidth="200" IsVisible="{Binding ShowMobilePhone}"><TextBlock Text="{Binding Texts[MobilePhone]}" Classes="eyebrow" /><TextBlock Text="{Binding MobilePhoneText}" Classes="muted" /></StackPanel>
       </WrapPanel>
       <Button HorizontalAlignment="Left" Content="{Binding RefreshPropertiesText}" IsVisible="{Binding CanRefreshProperties}" Command="{Binding RefreshPropertiesCommand}" />
      </StackPanel>

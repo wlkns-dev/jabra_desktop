@@ -10,6 +10,11 @@ internal static class DevicePropertyValueUpdate
         {
             DevicePropertyValueKind.Firmware => current with { FirmwareApplicable = true, Firmware = value is null ? null : PropertyValueMapper.Firmware(value) },
             DevicePropertyValueKind.BatteryPercent => current with { BatteryApplicable = true, BatteryPercent = value is null ? null : PropertyValueMapper.BatteryPercent(value) },
+            DevicePropertyValueKind.PartNumber => current with { PartNumber = value is null ? null : PropertyValueMapper.ProductText(value) },
+            DevicePropertyValueKind.AudioName => current with { AudioName = value is null ? null : PropertyValueMapper.ProductText(value) },
+            DevicePropertyValueKind.MobilePhone => current with {
+                MobilePhoneKnown = value is StringPropertyValue,
+                MobilePhone = value is null ? null : PropertyValueMapper.ProductText(value) },
             _ => current
         };
 

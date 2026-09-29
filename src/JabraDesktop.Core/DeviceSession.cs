@@ -56,9 +56,28 @@ public sealed class DeviceSession : IAsyncDisposable
                 peerSnapshots.TryAdd(id,new(id,[]));
                 if(!attachments.ContainsKey(id)) attachments[id]=++nextAttachment;
             }
+            foreach(var (dongleId,snapshot) in peerSnapshots.ToArray())
+            {
+                var updated=ReconcilePeersLocked(dongleId,snapshot.Peers);
+                if(snapshot.Peers.SequenceEqual(updated)) continue;
+                peerSnapshots[dongleId]=snapshot with { Peers=updated };
+                if(selected==dongleId) peers=updated;
+            }
             if(selected != null && !devices.Any(d => d.Id == selected)) SelectLocked(null);
         }
         Changed?.Invoke();
+    }
+    PeerInfo[] ReconcilePeersLocked(string dongleId,IReadOnlyList<PeerInfo> source)
+    {
+        var children=devices.Where(d=>d.ParentDongleId==dongleId && d.Properties is not null)
+            .ToDictionary(d=>d.Id);
+        return source.Select(peer=>
+        {
+            if(peer.State!=LinkState.Connected || peer.SourceDeviceId is not {} sourceId) return peer;
+            if(!children.TryGetValue(sourceId,out var child))
+                return peer.Properties is null ? peer : peer with { Properties=null };
+            return Equals(peer.Properties,child.Properties) ? peer : peer with { Properties=child.Properties };
+        }).ToArray();
     }
     void SelectLocked(string? id)
     {
@@ -90,8 +109,12 @@ public sealed class DeviceSession : IAsyncDisposable
             bool changed=false;
             lock(gate)
             {
-                if(Current(id,epoch) && !peers.SequenceEqual(update)) { peers=update.ToArray(); changed=true; }
-                if(Current(id,epoch)) peerSnapshots[id]=new(id,update.ToArray());
+                if(Current(id,epoch))
+                {
+                    var reconciled=ReconcilePeersLocked(id,update);
+                    if(!peers.SequenceEqual(reconciled)) { peers=reconciled; changed=true; }
+                    peerSnapshots[id]=new(id,reconciled);
+                }
             }
             if(changed) Changed?.Invoke();
         }, operationName:"refresh", showActivity:false);
@@ -139,8 +162,9 @@ public sealed class DeviceSession : IAsyncDisposable
             {
                 if(Attached(id,attachment))
                 {
-                    peerSnapshots[id]=new(id,update.ToArray());
-                    if(selected==id) peers=update.ToArray();
+                    var reconciled=ReconcilePeersLocked(id,update);
+                    peerSnapshots[id]=new(id,reconciled);
+                    if(selected==id) peers=reconciled;
                 }
             }
         }
@@ -278,7 +302,7 @@ public sealed class DeviceSession : IAsyncDisposable
         {
             lock(gate) if(!Current(id,epoch)) return;
             var update=await backend.GetPeersAsync(id,CancellationToken.None);
-            lock(gate) if(Current(id,epoch)) peers=update.ToArray();
+            lock(gate) if(Current(id,epoch)) peers=ReconcilePeersLocked(id,update);
         }
         catch(Exception e) { failure ??= e; }
         if(failure != null) throw failure;
@@ -317,8 +341,9 @@ public sealed class DeviceSession : IAsyncDisposable
                 var update=await backend.GetPeersAsync(dongleId,CancellationToken.None);
                 lock(gate) if(Attached(dongleId,attachment))
                 {
-                    peerSnapshots[dongleId]=new(dongleId,update.ToArray());
-                    if(selected==dongleId) peers=update.ToArray();
+                    var reconciled=ReconcilePeersLocked(dongleId,update);
+                    peerSnapshots[dongleId]=new(dongleId,reconciled);
+                    if(selected==dongleId) peers=reconciled;
                 }
             }
             catch(Exception e) { failure ??=e; }
@@ -367,8 +392,9 @@ public sealed class DeviceSession : IAsyncDisposable
             var update=await backend.GetPeersAsync(dongleId,CancellationToken.None);
             lock(gate) if(Attached(dongleId,attachment))
             {
-                peerSnapshots[dongleId]=new(dongleId,update.ToArray());
-                if(selected==dongleId) peers=update.ToArray();
+                var reconciled=ReconcilePeersLocked(dongleId,update);
+                peerSnapshots[dongleId]=new(dongleId,reconciled);
+                if(selected==dongleId) peers=reconciled;
             }
             return true;
         }
@@ -381,8 +407,9 @@ public sealed class DeviceSession : IAsyncDisposable
                     var update=await backend.GetPeersAsync(dongleId,CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(3));
                     lock(gate) if(Attached(dongleId,attachment))
                     {
-                        peerSnapshots[dongleId]=new(dongleId,update.ToArray());
-                        if(selected==dongleId) peers=update.ToArray();
+                        var reconciled=ReconcilePeersLocked(dongleId,update);
+                        peerSnapshots[dongleId]=new(dongleId,reconciled);
+                        if(selected==dongleId) peers=reconciled;
                     }
                 }
                 catch { /* A later inventory refresh will reconcile a temporarily unavailable device. */ }

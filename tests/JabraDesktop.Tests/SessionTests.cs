@@ -2,6 +2,75 @@ using JabraDesktop.Core;
 namespace JabraDesktop.Tests;
 public class SessionTests
 {
+    [Fact] public async Task UpdatedPhysicalChildPropertiesReachItsDonglePeerOnly()
+    {
+        var backend=new FakeBackend();
+        await using var session=new DeviceSession(backend);
+        backend.PeersByDongle["a"]=[new("pa","Headset A",LinkState.Connected,SourceDeviceId:"child-a")];
+        backend.PeersByDongle["b"]=[new("pb","Headset B",LinkState.Connected,SourceDeviceId:"child-b")];
+        backend.EmitDevices(
+            new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("b","Link 380",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child-a","Headset A",false,Role:DeviceRole.Headset,ParentDongleId:"a"),
+            new DeviceInfo("child-b","Headset B",false,Role:DeviceRole.Headset,ParentDongleId:"b"));
+        await session.RefreshAllAsync();
+
+        backend.EmitDevices(
+            new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("b","Link 380",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child-a","Headset A",false,Role:DeviceRole.Headset,ParentDongleId:"a",
+                Properties:new DeviceProperties(PartNumber:"7599-838-109")),
+            new DeviceInfo("child-b","Headset B",false,Role:DeviceRole.Headset,ParentDongleId:"b"));
+
+        Assert.Equal("7599-838-109",session.PeerSnapshots.Single(s=>s.DongleId=="a").Peers.Single().Properties?.PartNumber);
+        Assert.Null(session.PeerSnapshots.Single(s=>s.DongleId=="b").Peers.Single().Properties?.PartNumber);
+    }
+    [Fact] public async Task RemovedPhysicalChildClearsPeerProductInformation()
+    {
+        var backend=new FakeBackend();
+        await using var session=new DeviceSession(backend);
+        backend.PeersByDongle["a"]=[new("pa","Headset",LinkState.Connected,
+            new DeviceProperties(PartNumber:"7599-838-109",MobilePhoneKnown:true),SourceDeviceId:"child")];
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child","Headset",false,Role:DeviceRole.Headset,ParentDongleId:"a",
+                Properties:new DeviceProperties(PartNumber:"7599-838-109",MobilePhoneKnown:true)));
+        await session.RefreshAllAsync();
+
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle));
+
+        Assert.Null(session.PeerSnapshots.Single().Peers.Single().Properties?.PartNumber);
+        Assert.NotEqual(true,session.PeerSnapshots.Single().Peers.Single().Properties?.MobilePhoneKnown);
+    }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InFlightPairingRefreshCannotReplaceNewerPhysicalProperties(bool selectedRefresh)
+    {
+        var backend=new FakeBackend();
+        await using var session=new DeviceSession(backend);
+        backend.PeersByDongle["a"]=[new("pa","Headset",LinkState.Connected,
+            new DeviceProperties(PartNumber:"old"),SourceDeviceId:"child")];
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child","Headset",false,Role:DeviceRole.Headset,ParentDongleId:"a",
+                Properties:new DeviceProperties(PartNumber:"old")));
+        session.Select("a");
+        await session.RefreshAllAsync();
+        backend.CaptureReadBeforeWait=true;
+        backend.ReadCompletion=new(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.ReadStarted=new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var refresh=selectedRefresh ? session.RefreshAsync() : session.RefreshAsync("a");
+        await backend.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child","Headset",false,Role:DeviceRole.Headset,ParentDongleId:"a",
+                Properties:new DeviceProperties(PartNumber:"new")));
+        Assert.Equal("new",session.PeerSnapshots.Single().Peers.Single().Properties?.PartNumber);
+        backend.ReadCompletion.SetResult();
+        await refresh;
+
+        Assert.Equal("new",session.PeerSnapshots.Single().Peers.Single().Properties?.PartNumber);
+        Assert.Equal("new",session.Peers.Single().Properties?.PartNumber);
+    }
     [Fact] public async Task RefreshAllRetainsDistinctPeerGroupsForTwoDongles()
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend);

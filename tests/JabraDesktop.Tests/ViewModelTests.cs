@@ -86,6 +86,48 @@ public class ViewModelTests
         vm.SelectedPeer=null;
         Assert.False(vm.ShowBattery);
     }
+    [Fact] public async Task ProductInformationBelongsToSelectedDongleOrPeer()
+    {
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());
+        backend.EmitDevices(
+            new DeviceInfo("a","Link 370",true,Role:DeviceRole.Dongle,Properties:new DeviceProperties(AudioName:"Jabra Link 370")),
+            new DeviceInfo("b","Link 380",true,Role:DeviceRole.Dongle));
+        backend.PeersByDongle["b"]=[new("peer","Evolve 75",LinkState.Connected,
+            new DeviceProperties(PartNumber:"7599-838-109",MobilePhoneKnown:true))];
+        await session.RefreshAllAsync();
+
+        vm.SelectedDevice=vm.Devices.Single(d=>d.Device.Id=="a");
+        Assert.True(vm.ShowAudioName);
+        Assert.Equal("Jabra Link 370",vm.AudioNameText);
+        Assert.False(vm.ShowPartNumber);
+        Assert.False(vm.ShowMobilePhone);
+
+        vm.Dongles.Single(d=>d.Device.Device.Id=="b").Peers.Single().Select();
+        Assert.False(vm.ShowAudioName);
+        Assert.True(vm.ShowPartNumber);
+        Assert.Equal("7599-838-109",vm.PartNumberText);
+        Assert.True(vm.ShowMobilePhone);
+        Assert.Equal("Kein Telefon verbunden",vm.MobilePhoneText);
+
+        vm.SelectedDevice=vm.Devices.Single(d=>d.Device.Id=="b");
+        Assert.False(vm.ShowAudioName);
+        Assert.False(vm.ShowPartNumber);
+        Assert.False(vm.ShowMobilePhone);
+    }
+    [Fact] public void EmptyPhoneTextUpdatesWhenLanguageChanges()
+    {
+        var texts=new JabraDesktop.App.LocalizationService(JabraDesktop.App.UiLanguage.German);
+        var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a(),texts);
+        backend.EmitDevices(new DeviceInfo("headset","Evolve 75",false,Role:DeviceRole.Headset,
+            Properties:new DeviceProperties(MobilePhoneKnown:true)));
+        var changes=new List<string?>(); vm.PropertyChanged+=(_,e)=>changes.Add(e.PropertyName);
+        Assert.Equal("Kein Telefon verbunden",vm.MobilePhoneText);
+
+        texts.SetLanguage(JabraDesktop.App.UiLanguage.English);
+
+        Assert.Equal("No phone connected",vm.MobilePhoneText);
+        Assert.Contains(nameof(MainViewModel.MobilePhoneText),changes);
+    }
     [Fact] public async Task StartupAndPeriodicRefreshLoadAllDongleGroups()
     {
         var backend=new FakeBackend(); var session=new DeviceSession(backend); var vm=new MainViewModel(session,a=>a());

@@ -96,3 +96,28 @@ vorgenommen. Entfernen während einer Abfrage, getrennte Fehlerzustände,
 Aktionsziele und Bestätigung beim Entkoppeln werden automatisiert geprüft.
 Ein gebautes Ubuntu-Paket ist keine Bestätigung eines Ubuntu-Laufzeittests;
 der lokale Hardwaretest erfolgt auf CachyOS/KDE.
+
+## Produktdaten 0.5.2 – Prüfung am 29.09.2026
+
+Auf CachyOS/KDE waren Link 370 (`0B0E:245E`) und Link 380
+(`0B0E:24C7`) gleichzeitig angeschlossen. JabraCLI 1.6.48.0 las nur die
+unten genannten Properties; Seriennummern und Bluetooth-Adressen wurden
+nicht protokolliert. Die App 0.5.2 zeigte anschließend in der englischen
+Detailansicht die Daten des verbundenen Evolve 75 unter Link 370.
+
+| Gerät | SDK-Property | Gelesener Wert | 0.5.2-Anzeige |
+| --- | --- | --- | --- |
+| Link 370 | `audioName` | `Jabra Link 370` | Audiogerätename des Dongles |
+| Link 380 | `audioName` | `Jabra Link 380` | Audiogerätename des Dongles |
+| Evolve 75 (am Link 370) | `skuId` | `7599-838-109` | Teilenummer am verbundenen Endgerät |
+| Evolve 75 (am Link 370) | `mobileDevice1` | leerer String | „No phone connected“ am verbundenen Endgerät |
+
+Am Evolve 75 wurden Teilenummer und Telefonstatus im 0.5.2-Release-Build
+visuell geprüft. Die beiden Audiogerätenamen wurden lesend per
+JabraCLI bestätigt; die Dongle-Detailansicht wurde geöffnet, aber ihr Wert
+war im Screenshot unterhalb des sichtbaren Fensterausschnitts. Ein zunächst
+direkt nach den CLI-Aufrufen gestarteter App-Prozess meldete einen geschlossenen
+Device Connector. Nach einem sauberen Neustart zeigte die App beide Dongles,
+ihre verbundenen Geräte und die neuen Endgerätedaten; die Ursache des ersten
+Fehlers ist nicht bestimmt. Keine Einstellung, Kopplung oder Firmware wurde
+verändert. Andere Modelle und Ubuntu-Laufzeit bleiben ungetestet.
