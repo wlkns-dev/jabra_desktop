@@ -62,3 +62,37 @@ darf daraus nicht als Jabra-Direct-Funktion in dieser Ansicht abgeleitet werden.
 
 Das ist ein Vergleich und eine Prüfreihenfolge, noch keine Zusage, dass alle
 Jabra-Direct-Optionen über das Linux-SDK für jedes Gerät schreibbar sind.
+
+## Lesender Hardware-Abgleich am 29.09.2026
+
+JabraCLI 1.6.48.0 (Linux-Beta, von Jabra geladen und nur nach `/tmp`
+entpackt) fand den Link 370, PID 9310, Firmware 1.87.0, und das daran
+verbundene Evolve 75, PID 9318, Firmware 2.38.0. Alle folgenden Aufrufe
+waren `property read`; es wurde **keine Geräteeinstellung geschrieben**.
+Seriennummern werden hier bewusst nicht dokumentiert.
+
+| Gerät | Erfolgreich ausgelesene Eigenschaften | Bezug zu den Screenshots |
+| --- | --- | --- |
+| Link 370 | `radioPower=normal`, `softphoneIntegrationEnabled=true`, `automaticAudioDetection=enabled` | Funkreichweite, Softphone-Integration und wahrscheinlich PC-Audio sind technisch erreichbar. Die exakte Wirkung von `automaticAudioDetection` unter Linux ist noch zu prüfen. |
+| Link 370 | `audioName=Jabra Link 370`, `msTeamsFeatureEnabled=true` | Audiogerätename ist auslesbar. Das Teams-Flag ist auslesbar; es sollte nicht ohne weitere Prüfung als Zertifizierungsnachweis beschriftet werden. |
+| Link 370 | `ringtone=type0`, `ringer=true`, `usbHeadsetRinger=true`, `ringOnSecondIncomingCall=disabled` | Mehrere Klingelton-Eigenschaften sind lesbar. Welche davon exakt dem gezeigten Schalter „Ringtone in headset“ entspricht, ist nicht geklärt. |
+| Evolve 75 | `soundMode=treble`, `voicePrompts=voice`, `intellitoneLevel=level3`, `muteReminderInterval=0` | Klangprofil, Sprachansagen, SafeTone und Stummschaltungs-Erinnerung sind auslesbar. |
+| Evolve 75 | `sidetoneEnabledDsp=true`, `sidetoneLevelDsp=_0dB`, `inCallBusyLightEnabled=true`, `autoRejectBgWaitingEnabled=false`, `buttonSoundsEnabled=true` | Sidetone samt Pegel, Busylight, Anrufablehnung und Tastentöne sind auslesbar. |
+| Evolve 75 | `idlePowerSave=1`, `prioritizedComputerAudioEnabled=false` | Kandidaten für Ruhemodus und Computeraudio-Priorität. Einheit/Bedeutung des Ruhemoduswerts und Linux-Wirkung noch verifizieren. |
+| Evolve 75 | `mobileDevice1` leer, `skuId=7599-838-109`, `bluetoothName` lesbar | Die Anzeige „kein verbundenes Mobiltelefon“ und die Teilenummer sind technisch erreichbar; die Gerätenamensfunktion nutzt bereits `bluetoothName`. |
+
+Die im JSON-Katalog vorhandenen Standardnamen `sidetoneEnabled`,
+`sidetoneLevel`, `powerNapDelay` und `deviceName` wurden von **diesem**
+Evolve 75 mit „device doesn't implement this feature“ abgelehnt. Das ist
+ein konkreter Grund für geräteabhängige Capability-Abfragen statt einer
+statischen Einstellungsliste. Auch `sidetoneLevelEnum`, `powerSaveEnabled`,
+`powerSavingEnabled` und `usbDeviceType` waren nicht lesbar. Für den Schalter
+„Wired USB Audio“ wurde damit noch kein belastbares SDK-Gegenstück gefunden.
+
+Die lokal eingebundene Jabra-Property-Definition markiert viele der
+erfolgreich gelesenen Einstellungsnamen als les- und schreibbar, darunter
+`radioPower`, `soundMode`, `voicePrompts`, `intellitoneLevel` und die DSP-
+Sidetone-Varianten. **Ein tatsächlicher Schreibtest dieser Einstellungen
+wurde nicht durchgeführt**. Vor einer UI-Freigabe je Option gehören
+SDK-`IsReadWrite`, gültige Werte, Rücklesung und Verhalten am konkreten
+Gerät geprüft.
