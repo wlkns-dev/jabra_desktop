@@ -127,7 +127,7 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/jabra-desktop.desktop"
 4. Anschließend am gefundenen Gerät **Koppeln** drücken.
 5. Über **⋯ → Entkoppeln** lässt sich eine einzelne Kopplung nach Bestätigung entfernen.
 6. Unterstützt ein verbundenes Headset die beschreibbare Eigenschaft
-   `bluetoothName`, kannst du seinen Bluetooth-Namen über **⋯ → Bluetooth-Namen
+   `bluetoothName`, kannst du seinen Gerätenamen über **⋯ → Gerätenamen
    ändern** oder in der Geräteansicht ändern. Der Name wird im Headset gespeichert;
    bei der Suche kann er erst nach einer erneuten Verbindung erscheinen. Für
    getrennte oder nicht unterstützte Geräte wird die Aktion nicht angeboten.

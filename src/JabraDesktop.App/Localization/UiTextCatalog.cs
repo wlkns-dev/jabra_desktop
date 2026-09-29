@@ -87,10 +87,10 @@ public static class UiTextCatalog
         [UiText.DongleRefreshError] = "Die Geräteliste dieses Dongles konnte nicht aktualisiert werden.",
         [UiText.StandaloneDevices] = "Weitere Geräte",
         [UiText.ViaDongle] = "Über {0}",
-        [UiText.RenameBluetooth] = "Bluetooth-Namen ändern…",
-        [UiText.RenameBluetoothWindowTitle] = "Bluetooth-Namen ändern",
-        [UiText.RenameBluetoothDescription] = "Der Name wird auf dem verbundenen Gerät gespeichert. Bei der Suche kann der neue Name erst nach einer erneuten Verbindung erscheinen.",
-        [UiText.BluetoothNameLabel] = "Bluetooth-Name",
+        [UiText.RenameBluetooth] = "Gerätenamen ändern…",
+        [UiText.RenameBluetoothWindowTitle] = "Gerätenamen ändern",
+        [UiText.RenameBluetoothDescription] = "Der Gerätename wird auf dem verbundenen Gerät gespeichert. Bei der Suche kann der neue Name erst nach einer erneuten Verbindung erscheinen.",
+        [UiText.BluetoothNameLabel] = "Gerätename",
         [UiText.Save] = "Speichern"
     };
 
@@ -179,10 +179,10 @@ public static class UiTextCatalog
         [UiText.DongleRefreshError] = "This dongle's device list could not be refreshed.",
         [UiText.StandaloneDevices] = "Other devices",
         [UiText.ViaDongle] = "Via {0}",
-        [UiText.RenameBluetooth] = "Change Bluetooth name…",
-        [UiText.RenameBluetoothWindowTitle] = "Change Bluetooth name",
-        [UiText.RenameBluetoothDescription] = "The name is saved on the connected device. It may appear in searches after reconnecting.",
-        [UiText.BluetoothNameLabel] = "Bluetooth name",
+        [UiText.RenameBluetooth] = "Change device name…",
+        [UiText.RenameBluetoothWindowTitle] = "Change device name",
+        [UiText.RenameBluetoothDescription] = "The device name is saved on the connected device. It may appear in searches after reconnecting.",
+        [UiText.BluetoothNameLabel] = "Device name",
         [UiText.Save] = "Save"
     };
 
