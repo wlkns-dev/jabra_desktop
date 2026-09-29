@@ -5,6 +5,7 @@ namespace JabraDesktop.Core;
 // All state changes are serialized; consumers receive immutable snapshots.
 public sealed class DeviceSession : IAsyncDisposable
 {
+    public const string NameUnconfirmedError = "device-name-unconfirmed";
     readonly IDeviceBackend backend;
     readonly Action<string> diagnostic;
     readonly object gate = new();
@@ -373,6 +374,19 @@ public sealed class DeviceSession : IAsyncDisposable
         }
         catch(Exception e)
         {
+            if(e.Message==NameUnconfirmedError)
+            {
+                try
+                {
+                    var update=await backend.GetPeersAsync(dongleId,CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(3));
+                    lock(gate) if(Attached(dongleId,attachment))
+                    {
+                        peerSnapshots[dongleId]=new(dongleId,update.ToArray());
+                        if(selected==dongleId) peers=update.ToArray();
+                    }
+                }
+                catch { /* A later inventory refresh will reconcile a temporarily unavailable device. */ }
+            }
             lock(gate) if(Attached(dongleId,attachment) && peerSnapshots.TryGetValue(dongleId,out var last))
                 peerSnapshots[dongleId]=last with { Error=FriendlyError(e) };
             return false;

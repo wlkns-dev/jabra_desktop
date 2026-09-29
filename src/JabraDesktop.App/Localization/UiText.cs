@@ -89,5 +89,6 @@ public enum UiText
     RenameBluetoothWindowTitle,
     RenameBluetoothDescription,
     BluetoothNameLabel,
-    Save
+    Save,
+    DeviceNameUnconfirmed
 }

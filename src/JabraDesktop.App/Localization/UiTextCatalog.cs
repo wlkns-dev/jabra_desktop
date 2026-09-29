@@ -91,7 +91,8 @@ public static class UiTextCatalog
         [UiText.RenameBluetoothWindowTitle] = "Gerätenamen ändern",
         [UiText.RenameBluetoothDescription] = "Der Gerätename wird auf dem verbundenen Gerät gespeichert. Bei der Suche kann der neue Name erst nach einer erneuten Verbindung erscheinen.",
         [UiText.BluetoothNameLabel] = "Gerätename",
-        [UiText.Save] = "Speichern"
+        [UiText.Save] = "Speichern",
+        [UiText.DeviceNameUnconfirmed] = "Der Gerätename konnte nach dem Speichern nicht bestätigt werden. Verbinde das Gerät gegebenenfalls neu und aktualisiere den Status."
     };
 
     static readonly IReadOnlyDictionary<UiText, string> English = new Dictionary<UiText, string>
@@ -183,7 +184,8 @@ public static class UiTextCatalog
         [UiText.RenameBluetoothWindowTitle] = "Change device name",
         [UiText.RenameBluetoothDescription] = "The device name is saved on the connected device. It may appear in searches after reconnecting.",
         [UiText.BluetoothNameLabel] = "Device name",
-        [UiText.Save] = "Save"
+        [UiText.Save] = "Save",
+        [UiText.DeviceNameUnconfirmed] = "The device name could not be confirmed after saving. Reconnect the device if needed, then refresh its status."
     };
 
     public static string Get(UiLanguage language, UiText key)

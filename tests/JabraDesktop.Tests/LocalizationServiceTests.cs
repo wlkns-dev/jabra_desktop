@@ -8,6 +8,12 @@ namespace JabraDesktop.Tests;
 public sealed class LocalizationServiceTests
 {
     [Fact]
+    public void UnconfirmedDeviceNameUsesSelectedLanguage()
+    {
+        Assert.Contains("bestätigt",new LocalizationService(UiLanguage.German).TranslateSessionError("device-name-unconfirmed"));
+        Assert.Contains("confirmed",new LocalizationService(UiLanguage.English).TranslateSessionError("device-name-unconfirmed"));
+    }
+    [Fact]
     public void HierarchyLabelsExistInBothLanguages()
     {
         Assert.Equal("Weitere Geräte",UiTextCatalog.Get(UiLanguage.German,UiText.StandaloneDevices));

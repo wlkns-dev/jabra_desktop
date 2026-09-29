@@ -1,6 +1,7 @@
 using Jabra.NET.Sdk.Core;
 using Jabra.NET.Sdk.Core.Types;
 using Jabra.NET.Sdk.Properties;
+using JabraDesktop.Core;
 
 namespace JabraDesktop.Jabra;
 
@@ -9,7 +10,7 @@ internal interface IDevicePropertiesReader
     Task InitializeAsync(IApi api, CancellationToken token);
     Task<PropertyValue> GetAsync(IDevice device, string propertyName, CancellationToken token);
     Task<BluetoothNameStatus?> ReadBluetoothNameAsync(IDevice device,CancellationToken token) => Task.FromResult<BluetoothNameStatus?>(null);
-    Task<string?> SetBluetoothNameAsync(IDevice device,string name,CancellationToken token) =>
+    Task<string> SetBluetoothNameAsync(IDevice device,string name,CancellationToken token) =>
         throw new NotSupportedException("Bluetooth name change is not supported.");
 }
 
@@ -54,7 +55,7 @@ internal sealed class JabraPropertiesReader : IDevicePropertiesReader
             ? new BluetoothNameStatus(value.AsString().Trim(),true) : null;
     }
 
-    public async Task<string?> SetBluetoothNameAsync(IDevice device,string name,CancellationToken token)
+    public async Task<string> SetBluetoothNameAsync(IDevice device,string name,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         var currentFactory=factory ?? throw new InvalidOperationException("Jabra device properties are not initialized.");
@@ -67,8 +68,9 @@ internal sealed class JabraPropertiesReader : IDevicePropertiesReader
         try
         {
             var readback=await properties["bluetoothName"].Get();
-            return readback is StringPropertyValue && readback.AsString().Trim()==name ? name : null;
+            if(readback is StringPropertyValue && readback.AsString().Trim()==name) return name;
         }
-        catch { return null; /* The write may briefly disconnect the device. */ }
+        catch { /* The write may briefly disconnect the device. Report that confirmation is missing. */ }
+        throw new InvalidOperationException(DeviceSession.NameUnconfirmedError);
     }
 }

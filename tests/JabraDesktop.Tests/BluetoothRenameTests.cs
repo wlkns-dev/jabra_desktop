@@ -4,6 +4,20 @@ namespace JabraDesktop.Tests;
 
 public class BluetoothRenameTests
 {
+    [Fact] public async Task UnconfirmedWriteReportsErrorAndRefreshesActualPeerState()
+    {
+        var backend=new FakeBackend { RenameErrorAfterWrite=new InvalidOperationException("device-name-unconfirmed") };
+        var session=new DeviceSession(backend);
+        backend.PeersByDongle["a"]=[new("peer-a","Old name",LinkState.Connected,CanRenameBluetooth:true)];
+        backend.PeersByDongle["b"]=[new("peer-b","Other device",LinkState.Connected)];
+        backend.EmitDevices(new DeviceInfo("a","Link 370",true),new DeviceInfo("b","Link 380",true));
+        await session.RefreshAllAsync();
+
+        Assert.False(await session.RenamePeerAsync("a","peer-a","New name"));
+        Assert.Equal("New name",session.PeerSnapshots.Single(s=>s.DongleId=="a").Peers.Single().Name);
+        Assert.Equal("device-name-unconfirmed",session.PeerSnapshots.Single(s=>s.DongleId=="a").Error);
+        Assert.Null(session.PeerSnapshots.Single(s=>s.DongleId=="b").Error);
+    }
     [Fact] public async Task RenameTargetsConnectedPeerOnItsOwnDongle()
     {
         var backend=new FakeBackend();

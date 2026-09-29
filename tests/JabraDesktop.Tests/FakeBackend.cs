@@ -21,6 +21,7 @@ public sealed class FakeBackend : IDeviceBackend
     public List<string> PropertyRefreshCalls { get; }=[];
     public List<(string Dongle, string Peer, DeviceAction Action)> Calls { get; } = [];
     public List<(string Dongle,string Peer,string Name)> RenameCalls { get; } = [];
+    public Exception? RenameErrorAfterWrite { get; set; }
     public int ScanStarted { get; private set; }
     public void EmitDevices(params DeviceInfo[] devices) => DevicesChanged?.Invoke(devices);
     public void Fail(string text) => Faulted?.Invoke(text);
@@ -45,6 +46,7 @@ public sealed class FakeBackend : IDeviceBackend
         RenameCalls.Add((dongleId,peerId,bluetoothName));
         if(PeersByDongle.TryGetValue(dongleId,out var peers))
             PeersByDongle[dongleId]=peers.Select(p=>p.Id==peerId ? p with { Name=bluetoothName } : p).ToArray();
+        if(RenameErrorAfterWrite is {} error) throw error;
         return Task.CompletedTask;
     }
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

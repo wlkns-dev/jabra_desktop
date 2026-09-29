@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using JabraDesktop.Core;
 
 namespace JabraDesktop.App;
 
@@ -40,6 +41,7 @@ public sealed class LocalizationService(UiLanguage initialLanguage) : INotifyPro
         "Eine benötigte Systembibliothek fehlt. Bitte die Einrichtung in der README prüfen." => this[UiText.MissingSystemLibrary],
         "Bitte einen Bluetooth-Dongle mit unterstützter Geräteverwaltung auswählen." => this[UiText.SelectSupportedDongle],
         "Gerät nicht mehr verfügbar. Bitte aktualisieren oder erneut suchen." => this[UiText.PeerNoLongerAvailable],
+        DeviceSession.NameUnconfirmedError => this[UiText.DeviceNameUnconfirmed],
         _ => error
     };
 

@@ -326,7 +326,8 @@ public sealed class JabraBackend : IDeviceBackend
         if(child?.CanRenameBluetooth!=true)
             throw new NotSupportedException("Bluetooth-Name kann für dieses Gerät nicht geändert werden.");
         var confirmed=await propertiesReader.SetBluetoothNameAsync(child.Source,bluetoothName,token);
-        lock(gate) if(!disposed && entries.Values.Contains(child) && confirmed==bluetoothName)
+        if(confirmed!=bluetoothName) throw new InvalidOperationException(DeviceSession.NameUnconfirmedError);
+        lock(gate) if(!disposed && entries.Values.Contains(child))
             child.BluetoothName=confirmed;
     }
     public async IAsyncEnumerable<PeerInfo> ScanAsync(string dongleId,[EnumeratorCancellation] CancellationToken token)
