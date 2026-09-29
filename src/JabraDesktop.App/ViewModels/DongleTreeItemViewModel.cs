@@ -17,10 +17,11 @@ public sealed class DongleTreeItemViewModel : ObservableObject
     public void Update(DonglePeerSnapshot snapshot, Func<PeerInfo, PeerRow> createRow)
     {
         Error = snapshot.Error;
-        for(var i=Peers.Count-1;i>=0;i--) if(!snapshot.Peers.Any(p=>p.Id==Peers[i].Peer.Id)) Peers.RemoveAt(i);
-        for(var target=0;target<snapshot.Peers.Count;target++)
+        var connected=snapshot.Peers.Where(p=>p.State==LinkState.Connected).ToArray();
+        for(var i=Peers.Count-1;i>=0;i--) if(!connected.Any(p=>p.Id==Peers[i].Peer.Id)) Peers.RemoveAt(i);
+        for(var target=0;target<connected.Length;target++)
         {
-            var peer=snapshot.Peers[target];
+            var peer=connected[target];
             var existing=Peers.FirstOrDefault(p=>p.Peer.Id==peer.Id);
             if(existing is null) Peers.Insert(target,createRow(peer));
             else

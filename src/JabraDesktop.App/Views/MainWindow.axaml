@@ -18,7 +18,10 @@
      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
       <Button Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" />
       <Button Content="⋯" IsVisible="{Binding IsSaved}" ToolTip.Tip="{Binding Texts[MoreActions]}" AutomationProperties.Name="{Binding Texts[MoreDeviceActions]}">
-       <Button.Flyout><MenuFlyout><MenuItem Header="{Binding Texts[UnpairMenu]}" Command="{Binding UnpairCommand}" /></MenuFlyout></Button.Flyout>
+       <Button.Flyout><MenuFlyout>
+        <MenuItem Header="{Binding Texts[RenameBluetooth]}" Command="{Binding RenameCommand}" IsVisible="{Binding CanRenameBluetooth}" />
+        <MenuItem Header="{Binding Texts[UnpairMenu]}" Command="{Binding UnpairCommand}" />
+       </MenuFlyout></Button.Flyout>
       </Button>
      </StackPanel>
     </Grid>
@@ -101,6 +104,7 @@
       <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" />
       <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEndpointSelected}">
        <Button Content="{Binding SelectedPeer.ActionLabel}" Command="{Binding SelectedPeer.ActionCommand}" />
+       <Button Content="{Binding Texts[RenameBluetooth]}" Command="{Binding SelectedPeer.RenameCommand}" IsVisible="{Binding SelectedPeer.CanRenameBluetooth}" />
        <Button Content="{Binding Texts[Unpair]}" Command="{Binding SelectedPeer.UnpairCommand}" />
       </StackPanel>
      </StackPanel>

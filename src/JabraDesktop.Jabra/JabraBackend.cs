@@ -27,6 +27,9 @@ public sealed class JabraBackend : IDeviceBackend
         public DateTimeOffset LastPropertyRefresh { get; set; }
         public DeviceProperties Properties { get; set; } = new();
         public bool CanRefreshProperties { get; set; }
+        public Task<BluetoothNameStatus?>? BluetoothNameLookup { get; set; }
+        public bool CanRenameBluetooth { get; set; }
+        public string? BluetoothName { get; set; }
         public ConcurrentDictionary<DevicePropertyValueKind, DevicePropertyReadRunner> PropertyReadRunners { get; } = new();
         public DeviceInfo BaseInfo => new(Id,DeviceMapper.DisplayName(Source.Name),Dongle != null,
             Role:DeviceMapper.Role(Source.Type),
@@ -147,7 +150,20 @@ public sealed class JabraBackend : IDeviceBackend
     {
         publisher.Publish(() =>
         {
-            lock(gate) return disposed ? [] : entries.Values.Select(e=>e.Info).ToArray();
+            lock(gate)
+            {
+                if(disposed) return [];
+                var current=entries.Values.ToArray();
+                return current.Select(entry =>
+                {
+                    var parent=entry.Dongle is null
+                        ? current.FirstOrDefault(candidate=>!ReferenceEquals(candidate,entry)
+                            && (candidate.Dongle is not null || DeviceMapper.Role(candidate.Source.Type)==DeviceRole.Dongle)
+                            && IsChildOf(entry,candidate))
+                        : null;
+                    return entry.Info with { ParentDongleId=parent?.Id };
+                }).ToArray();
+            }
         }, snapshot => { if(!disposed) DevicesChanged?.Invoke(snapshot); });
     }
     DeviceEntry Find(string id)
@@ -204,7 +220,7 @@ public sealed class JabraBackend : IDeviceBackend
                 entry.LastPropertyRefresh=DateTimeOffset.UtcNow;
                 refresh=entry.PropertyRefresh=Task.Run(async ()=>
                 {
-                    await Task.WhenAll(DevicePropertyCapabilities.For(entry.BaseInfo).Select(async capability=>
+                    var reads=DevicePropertyCapabilities.For(entry.BaseInfo).Select(async capability=>
                     {
                         var runner=entry.PropertyReadRunners.GetOrAdd(capability.ValueKind,_=>new DevicePropertyReadRunner());
                         var value=await runner.ReadAsync(()=>propertiesReader.GetAsync(entry.Source,capability.PropertyName,CancellationToken.None),CancellationToken.None);
@@ -214,11 +230,33 @@ public sealed class JabraBackend : IDeviceBackend
                             entry.Properties=DevicePropertyValueUpdate.Apply(entry.Properties,capability,value);
                         }
                         Publish();
-                    }));
+                    });
+                    await Task.WhenAll(reads.Append(RefreshBluetoothNameAsync(entry)));
                 });
             }
         }
         return refresh.WaitAsync(token);
+    }
+    async Task RefreshBluetoothNameAsync(DeviceEntry entry)
+    {
+        if(entry.Dongle is not null || DeviceMapper.Role(entry.Source.Type) is not (DeviceRole.Headset or DeviceRole.Other)) return;
+        Task<BluetoothNameStatus?> lookup;
+        lock(gate)
+        {
+            if(entry.BluetoothNameLookup is not {IsCompleted:false})
+                entry.BluetoothNameLookup=Task.Run(()=>propertiesReader.ReadBluetoothNameAsync(entry.Source,CancellationToken.None));
+            lookup=entry.BluetoothNameLookup;
+        }
+        try
+        {
+            var result=await lookup.WaitAsync(TimeSpan.FromSeconds(3));
+            lock(gate) if(!disposed && entries.Values.Contains(entry) && result?.CanWrite==true)
+            {
+                entry.CanRenameBluetooth=true;
+                entry.BluetoothName=result.Name;
+            }
+        }
+        catch { /* Unsupported or slow name lookup does not block telemetry or pairing. */ }
     }
     public async Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token)
     {
@@ -272,10 +310,24 @@ public sealed class JabraBackend : IDeviceBackend
             foreach(var candidate in candidates) _=DiscoverChildAsync(candidate);
             if(child?.CanRefreshProperties==true && DeviceMapper.State(peer.ConnectionStatus)==LinkState.Connected)
                 _=RefreshPropertiesAsync(child,CancellationToken.None);
-            result.Add(new PeerInfo(peerId,DeviceMapper.DisplayName(peer.BluetoothName),
-                DeviceMapper.State(peer.ConnectionStatus),properties,child?.Id));
+            var state=DeviceMapper.State(peer.ConnectionStatus);
+            result.Add(new PeerInfo(peerId,child?.BluetoothName ?? DeviceMapper.DisplayName(peer.BluetoothName),
+                state,properties,child?.Id,state==LinkState.Connected && child?.CanRenameBluetooth==true));
         }
         return result;
+    }
+    public async Task RenamePeerAsync(string dongleId,string peerId,string bluetoothName,CancellationToken token)
+    {
+        var parent=Find(dongleId);
+        if(!parent.Addresses.TryGetValue(peerId,out var address))
+            throw new InvalidOperationException("Gerät nicht mehr bekannt. Bitte aktualisieren.");
+        DeviceEntry? child;
+        lock(gate) child=ResolvePeer(parent,address);
+        if(child?.CanRenameBluetooth!=true)
+            throw new NotSupportedException("Bluetooth-Name kann für dieses Gerät nicht geändert werden.");
+        var confirmed=await propertiesReader.SetBluetoothNameAsync(child.Source,bluetoothName,token);
+        lock(gate) if(!disposed && entries.Values.Contains(child) && confirmed==bluetoothName)
+            child.BluetoothName=confirmed;
     }
     public async IAsyncEnumerable<PeerInfo> ScanAsync(string dongleId,[EnumeratorCancellation] CancellationToken token)
     {

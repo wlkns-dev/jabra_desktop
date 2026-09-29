@@ -86,7 +86,12 @@ public static class UiTextCatalog
         [UiText.UnpairDescription] = "Die gespeicherte Kopplung wird vom Dongle entfernt. Zum erneuten Verbinden ist Pairing nötig.",
         [UiText.DongleRefreshError] = "Die Geräteliste dieses Dongles konnte nicht aktualisiert werden.",
         [UiText.StandaloneDevices] = "Weitere Geräte",
-        [UiText.ViaDongle] = "Über {0}"
+        [UiText.ViaDongle] = "Über {0}",
+        [UiText.RenameBluetooth] = "Gerätenamen ändern…",
+        [UiText.RenameBluetoothWindowTitle] = "Gerätenamen ändern",
+        [UiText.RenameBluetoothDescription] = "Der Gerätename wird auf dem verbundenen Gerät gespeichert. Bei der Suche kann der neue Name erst nach einer erneuten Verbindung erscheinen.",
+        [UiText.BluetoothNameLabel] = "Gerätename",
+        [UiText.Save] = "Speichern"
     };
 
     static readonly IReadOnlyDictionary<UiText, string> English = new Dictionary<UiText, string>
@@ -173,7 +178,12 @@ public static class UiTextCatalog
         [UiText.UnpairDescription] = "The saved pairing will be removed from the dongle. Pair the headset again before reconnecting.",
         [UiText.DongleRefreshError] = "This dongle's device list could not be refreshed.",
         [UiText.StandaloneDevices] = "Other devices",
-        [UiText.ViaDongle] = "Via {0}"
+        [UiText.ViaDongle] = "Via {0}",
+        [UiText.RenameBluetooth] = "Change device name…",
+        [UiText.RenameBluetoothWindowTitle] = "Change device name",
+        [UiText.RenameBluetoothDescription] = "The device name is saved on the connected device. It may appear in searches after reconnecting.",
+        [UiText.BluetoothNameLabel] = "Device name",
+        [UiText.Save] = "Save"
     };
 
     public static string Get(UiLanguage language, UiText key)

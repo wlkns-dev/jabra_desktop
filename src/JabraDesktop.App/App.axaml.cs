@@ -90,6 +90,7 @@ public partial class App : Application
             viewModel = new MainViewModel(session, action => Dispatcher.UIThread.Post(action), localization);
             mainWindow = new MainWindow { DataContext = viewModel };
             viewModel.ConfirmUnpair = mainWindow.ConfirmUnpair;
+            viewModel.PromptBluetoothName = mainWindow.PromptBluetoothName;
             desktop.MainWindow = mainWindow;
 
             refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };

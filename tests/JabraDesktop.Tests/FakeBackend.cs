@@ -20,6 +20,7 @@ public sealed class FakeBackend : IDeviceBackend
     public Task RefreshPeerPropertiesAsync(string dongleId,string peerId,CancellationToken token) { PeerPropertyRefreshCalls.Add((dongleId,peerId)); return Task.CompletedTask; }
     public List<string> PropertyRefreshCalls { get; }=[];
     public List<(string Dongle, string Peer, DeviceAction Action)> Calls { get; } = [];
+    public List<(string Dongle,string Peer,string Name)> RenameCalls { get; } = [];
     public int ScanStarted { get; private set; }
     public void EmitDevices(params DeviceInfo[] devices) => DevicesChanged?.Invoke(devices);
     public void Fail(string text) => Faulted?.Invoke(text);
@@ -38,6 +39,13 @@ public sealed class FakeBackend : IDeviceBackend
         Calls.Add((id,peer,action));
         if(OperationCompletion is {} completion) await completion.Task;
         if(NextError is {} e) throw e;
+    }
+    public Task RenamePeerAsync(string dongleId,string peerId,string bluetoothName,CancellationToken token)
+    {
+        RenameCalls.Add((dongleId,peerId,bluetoothName));
+        if(PeersByDongle.TryGetValue(dongleId,out var peers))
+            PeersByDongle[dongleId]=peers.Select(p=>p.Id==peerId ? p with { Name=bluetoothName } : p).ToArray();
+        return Task.CompletedTask;
     }
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

@@ -76,16 +76,52 @@ public class MultiDongleRegressionTests
         await session.RefreshAllAsync();
         Assert.Single(vm.Dongles[0].Peers); Assert.Empty(vm.StandaloneDevices);
     }
-    [Fact] public async Task SelectedEndpointUpdatesInPlaceAndRemainsSelected()
+    [Fact] public void DongleChildIsNotShownAsStandaloneWhilePairingListLoads()
+    {
+        var backend=new FakeBackend();
+        var session=new DeviceSession(backend);
+        var vm=new MainViewModel(session,action=>action());
+        backend.EmitDevices(
+            new DeviceInfo("link","Link 370",true,Role:DeviceRole.Dongle),
+            new DeviceInfo("child","Evolve 75",false,Role:DeviceRole.Headset,ParentDongleId:"link"),
+            new DeviceInfo("wired","USB Headset",false,Role:DeviceRole.Headset));
+        Assert.Single(vm.Dongles);
+        Assert.Empty(vm.Dongles[0].Peers);
+        Assert.Equal("wired",Assert.Single(vm.StandaloneDevices).Device.Id);
+    }
+    [Fact] public async Task SelectedConnectedEndpointUpdatesInPlaceAndRemainsSelected()
     {
         var (backend,session,vm)=await Setup();
         var row=vm.Dongles[0].Peers[0]; row.Select();
-        backend.PeersByDongle["a"]=[row.Peer with {State=LinkState.Disconnected}];
+        backend.PeersByDongle["a"]=[row.Peer with {Properties=new(true,64,true,"speaker-fw") }];
         await session.RefreshAllAsync();
         Assert.Same(row,vm.Dongles[0].Peers[0]);
         Assert.Same(row,vm.SelectedPeer);
-        Assert.False(vm.SelectedPeer!.Connected);
-        Assert.Equal(vm.Texts[UiText.Connect],vm.SelectedPeer.ActionLabel);
+        Assert.True(vm.SelectedPeer!.Connected);
+        Assert.Contains("64 %",vm.SelectedPeer.TelemetrySummary);
+    }
+    [Fact] public async Task SidebarShowsOnlyConnectedPeersButPairingListRetainsAll()
+    {
+        var (backend,session,vm)=await Setup();
+        backend.PeersByDongle["a"]=[
+            new("peer","Speaker",LinkState.Connected),
+            new("saved","Saved headset",LinkState.Disconnected),
+            new("unknown","Unknown headset",LinkState.Unknown)
+        ];
+        await session.RefreshAllAsync();
+        Assert.Equal(["peer"],vm.Dongles[0].Peers.Select(p=>p.Peer.Id));
+        Assert.Equal(3,vm.Peers.Count);
+        vm.Dongles[0].Peers[0].Select();
+        backend.PeersByDongle["a"]=[
+            new("peer","Speaker",LinkState.Disconnected),
+            new("saved","Saved headset",LinkState.Connected),
+            new("unknown","Unknown headset",LinkState.Unknown)
+        ];
+        await session.RefreshAllAsync();
+        Assert.Equal(["saved"],vm.Dongles[0].Peers.Select(p=>p.Peer.Id));
+        Assert.Null(vm.SelectedPeer);
+        Assert.Equal(3,vm.Peers.Count);
+        Assert.Contains(vm.Peers,p=>p.Peer.Id=="peer" && p.ActionLabel==vm.Texts[UiText.Connect]);
     }
     [Fact] public async Task SelectingParentAfterChildReturnsToDongleView()
     {

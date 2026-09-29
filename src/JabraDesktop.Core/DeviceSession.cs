@@ -337,6 +337,53 @@ public sealed class DeviceSession : IAsyncDisposable
             Changed?.Invoke();
         }
     }
+    public async Task<bool> RenamePeerAsync(string dongleId,string peerId,string newName,CancellationToken token=default)
+    {
+        var bluetoothName=BluetoothNameRules.Normalize(newName);
+        if(bluetoothName is null) return false;
+        SemaphoreSlim operationLock;
+        long attachment;
+        lock(gate)
+        {
+            if(disposed || !attachments.TryGetValue(dongleId,out attachment)) return false;
+            if(!operationLocks.TryGetValue(dongleId,out operationLock!)) operationLocks[dongleId]=operationLock=new(1,1);
+        }
+        try { await operationLock.WaitAsync(token); }
+        catch(OperationCanceledException) { return false; }
+        bool active=false;
+        try
+        {
+            lock(gate)
+            {
+                if(!Attached(dongleId,attachment)
+                    || !peerSnapshots.TryGetValue(dongleId,out var snapshot)
+                    || !snapshot.Peers.Any(p=>p.Id==peerId && p.State==LinkState.Connected && p.CanRenameBluetooth)) return false;
+                foregroundBusy.Add(dongleId); active=true;
+                peerSnapshots[dongleId]=snapshot with { Error=null };
+            }
+            Changed?.Invoke();
+            await backend.RenamePeerAsync(dongleId,peerId,bluetoothName,token);
+            var update=await backend.GetPeersAsync(dongleId,CancellationToken.None);
+            lock(gate) if(Attached(dongleId,attachment))
+            {
+                peerSnapshots[dongleId]=new(dongleId,update.ToArray());
+                if(selected==dongleId) peers=update.ToArray();
+            }
+            return true;
+        }
+        catch(Exception e)
+        {
+            lock(gate) if(Attached(dongleId,attachment) && peerSnapshots.TryGetValue(dongleId,out var last))
+                peerSnapshots[dongleId]=last with { Error=FriendlyError(e) };
+            return false;
+        }
+        finally
+        {
+            lock(gate) if(active) foregroundBusy.Remove(dongleId);
+            operationLock.Release();
+            Changed?.Invoke();
+        }
+    }
     public static string FriendlyError(Exception e) => e switch
     {
         UnauthorizedAccessException => "USB-Zugriff verweigert. Jabra-Zugriffsregel installieren und Dongle neu einstecken.",

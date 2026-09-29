@@ -22,6 +22,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public LocalizationService Texts => texts;
     internal string? SessionSelectedId => session.SelectedId;
     public Func<string,Task<bool>> ConfirmUnpair { get; set; } = _ => Task.FromResult(false);
+    public Func<string,Task<string?>> PromptBluetoothName { get; set; } = _ => Task.FromResult<string?>(null);
     public DeviceListItemViewModel? SelectedDevice
     {
         get=>selectedDevice;
@@ -197,7 +198,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             group.Update(peerSnapshot,p=>new PeerRow(p,false,this,info.Id));
         }
         var nestedIds=snapshots.SelectMany(s=>s.Peers).Select(p=>p.SourceDeviceId).OfType<string>().ToHashSet();
-        var standalone=devices.Where(d=>!d.CanPair && !nestedIds.Contains(d.Id)).ToArray();
+        var standalone=devices.Where(d=>!d.CanPair && d.ParentDongleId is null && !nestedIds.Contains(d.Id)).ToArray();
         for(var i=StandaloneDevices.Count-1;i>=0;i--) if(!standalone.Any(d=>d.Id==StandaloneDevices[i].Device.Id)) StandaloneDevices.RemoveAt(i);
         foreach(var info in standalone)
         {
@@ -247,6 +248,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if(action==DeviceAction.Unpair && !await ConfirmUnpair(peer.Name)) return;
         await session.RunAsync(dongleId,peer.Id,action);
     }
+    internal async Task RenamePeerAsync(PeerInfo peer,string dongleId)
+    {
+        if(peer.State!=LinkState.Connected || !peer.CanRenameBluetooth || !CanAct(dongleId)) return;
+        var name=await PromptBluetoothName(peer.Name);
+        if(name is not null) await session.RenamePeerAsync(dongleId,peer.Id,name);
+    }
     public void Dispose()
     {
         disposed = true;
@@ -265,11 +272,13 @@ public sealed class PeerRow : ObservableObject
     public bool IsFound { get; }
     public bool IsSaved=>!IsFound;
     public bool Connected=>Peer.State==LinkState.Connected;
+    public bool CanRenameBluetooth=>!IsFound && Connected && Peer.CanRenameBluetooth;
     public string Status=>IsFound ? owner.Texts[UiText.FoundForPairing] : Peer.State switch
     { LinkState.Connected=>owner.Texts[UiText.Connected],LinkState.Disconnected=>owner.Texts[UiText.Disconnected],_=>owner.Texts[UiText.UnknownStatus] };
     public string ActionLabel=>IsFound ? owner.Texts[UiText.Pair] : Connected ? owner.Texts[UiText.Disconnect] : owner.Texts[UiText.Connect];
     public IAsyncRelayCommand ActionCommand { get; }
     public IAsyncRelayCommand UnpairCommand { get; }
+    public IAsyncRelayCommand RenameCommand { get; }
     public IRelayCommand SelectCommand { get; }
     public PeerRow(PeerInfo peer,bool found,MainViewModel owner,string dongleId="")
     {
@@ -278,6 +287,7 @@ public sealed class PeerRow : ObservableObject
         DongleId=target ?? string.Empty;
         ActionCommand=new AsyncRelayCommand(()=>owner.ActAsync(Peer,found ? DeviceAction.Pair : Connected ? DeviceAction.Disconnect : DeviceAction.Connect,DongleId),()=>found ? owner.CanScan : owner.CanAct(DongleId));
         UnpairCommand=new AsyncRelayCommand(()=>owner.ActAsync(Peer,DeviceAction.Unpair,DongleId),()=>!found && owner.CanAct(DongleId));
+        RenameCommand=new AsyncRelayCommand(()=>owner.RenamePeerAsync(Peer,DongleId),()=>CanRenameBluetooth && owner.CanAct(DongleId));
         SelectCommand=new RelayCommand(Select);
     }
     public void Select() { if(!IsFound) owner.SelectedPeer=this; }
@@ -285,12 +295,12 @@ public sealed class PeerRow : ObservableObject
     {
         if(Peer==peer) return;
         Peer=peer;
-        foreach(var property in new[]{nameof(Peer),nameof(Name),nameof(Connected),nameof(Status),nameof(ActionLabel),nameof(TelemetrySummary),nameof(HasTelemetry)}) OnPropertyChanged(property);
+        foreach(var property in new[]{nameof(Peer),nameof(Name),nameof(Connected),nameof(CanRenameBluetooth),nameof(Status),nameof(ActionLabel),nameof(TelemetrySummary),nameof(HasTelemetry)}) OnPropertyChanged(property);
         NotifyEnabled();
     }
     public bool HasTelemetry=>Peer.Properties?.BatteryPercent is not null || Peer.Properties?.Firmware is not null;
     public string TelemetrySummary => string.Join(" · ", new[]{Peer.Properties?.BatteryPercent is {} n ? $"{n} %" : null, Peer.Properties?.Firmware}.Where(s=>s is not null));
-    public void NotifyEnabled() { OnPropertyChanged(nameof(IsSelected)); ActionCommand.NotifyCanExecuteChanged(); UnpairCommand.NotifyCanExecuteChanged(); }
+    public void NotifyEnabled() { OnPropertyChanged(nameof(IsSelected)); ActionCommand.NotifyCanExecuteChanged(); UnpairCommand.NotifyCanExecuteChanged(); RenameCommand.NotifyCanExecuteChanged(); }
     public void NotifyLocalizationChanged()
     {
         OnPropertyChanged(nameof(Status));
